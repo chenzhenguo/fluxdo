@@ -534,6 +534,7 @@ class MarkdownEditorState extends ConsumerState<MarkdownEditor> {
     final wrappedField = Listener(
       onPointerUp: (_) {
         if (_readOnly) {
+          _emojiPanelIntended = false;
           _updateReadOnly(false);
           _panelController.updatePanelType(ChatBottomPanelType.keyboard);
         }
