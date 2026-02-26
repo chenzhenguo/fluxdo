@@ -75,6 +75,12 @@ class CurrentUserNotifier extends AsyncNotifier<User?> {
 final currentUserProvider =
     AsyncNotifierProvider<CurrentUserNotifier, User?>(CurrentUserNotifier.new);
 
+/// 系统用户头像模板 Provider
+/// 用于通知列表中没有 acting_user 时的默认头像
+final systemUserAvatarTemplateProvider = FutureProvider<String?>((ref) async {
+  return PreloadedDataService().getSystemUserAvatarTemplate();
+});
+
 /// 用户统计数据 Provider
 final userSummaryProvider = FutureProvider<UserSummary?>((ref) async {
   final service = ref.watch(discourseServiceProvider);

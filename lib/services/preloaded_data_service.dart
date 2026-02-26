@@ -85,6 +85,13 @@ class PreloadedDataService {
     return _site;
   }
 
+  /// 获取系统用户头像模板
+  /// 用于通知列表中没有 acting_user 时的默认头像
+  Future<String?> getSystemUserAvatarTemplate() async {
+    await _ensureLoaded();
+    return _site?['system_user_avatar_template'] as String?;
+  }
+
   /// 获取分类列表（从预加载的 site 数据中提取）
   Future<List<Category>?> getCategories() async {
     await _ensureLoaded();

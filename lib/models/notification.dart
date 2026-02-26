@@ -182,10 +182,48 @@ class DiscourseNotification {
 
   /// 获取通知标题
   String get title {
-    // 优先使用 data.topicTitle（纯文本格式，避免 HTML 实体问题）
+    final displayName = data.displayUsername ?? data.originalUsername ?? '';
+
+    // 某些类型有专门的标题逻辑，不应使用话题标题
+    switch (notificationType) {
+      case NotificationType.grantedBadge:
+        return data.badgeName != null
+            ? "获得了 '${data.badgeName}'"
+            : notificationType.label;
+      case NotificationType.inviteeAccepted:
+        return displayName.isNotEmpty ? '$displayName 接受了你的邀请' : notificationType.label;
+      case NotificationType.following:
+        return displayName.isNotEmpty ? '$displayName 开始关注你' : notificationType.label;
+      case NotificationType.likedConsolidated:
+        final count = data.count ?? 0;
+        return displayName.isNotEmpty
+            ? '$displayName 点赞了你的 $count 个帖子'
+            : '$count 人赞了你的帖子';
+      case NotificationType.linkedConsolidated:
+        final count = data.count ?? 0;
+        return displayName.isNotEmpty
+            ? '$displayName 链接了你的 $count 个帖子'
+            : '$count 人链接了你的帖子';
+      case NotificationType.groupMessageSummary:
+        final count = data.inboxCount ?? '0';
+        return '${data.groupName ?? ""} 收件箱有 $count 条消息';
+      case NotificationType.membershipRequestAccepted:
+        return "加入 '${data.groupName ?? ""}' 的申请已被接受";
+      case NotificationType.membershipRequestConsolidated:
+        final count = data.count ?? 0;
+        return "$count 个未处理的 '${data.groupName ?? ""}' 成员申请";
+      case NotificationType.newFeatures:
+        return '有新功能可用！';
+      case NotificationType.adminProblems:
+        return '网站信息中心有新建议';
+      default:
+        break;
+    }
+
+    // 话题类通知：使用话题标题
     if (data.topicTitle != null && data.topicTitle!.isNotEmpty) return data.topicTitle!;
-    // 其次使用 fancy_title
     if (fancyTitle != null && fancyTitle!.isNotEmpty) return fancyTitle!;
+
     // 兜底使用通知类型
     return notificationType.label;
   }
@@ -194,6 +232,7 @@ class DiscourseNotification {
   String get description {
     final username = data.displayUsername ?? data.originalUsername ?? '';
     switch (notificationType) {
+      // === 话题类通知：描述为 "用户 + 操作" ===
       case NotificationType.mentioned:
         return '$username 在帖子中提及了你';
       case NotificationType.replied:
@@ -201,26 +240,30 @@ class DiscourseNotification {
       case NotificationType.quoted:
         return '$username 引用了你的帖子';
       case NotificationType.liked:
-        return '$username 赞了你的帖子';
-      case NotificationType.likedConsolidated:
+        // 处理多人点赞
         final count = data.count ?? 1;
-        return '$count 人赞了你的帖子';
+        if (count <= 1) {
+          return '$username 赞了你的帖子';
+        } else if (count == 2) {
+          final username2 = data.username2 ?? '';
+          return '$username、$username2 赞了你的帖子';
+        } else {
+          return '$username 和其他 ${count - 1} 人赞了你的帖子';
+        }
       case NotificationType.privateMessage:
         return '$username 发送了私信';
       case NotificationType.posted:
         return '$username 发布了新帖子';
-      case NotificationType.grantedBadge:
-        return '获得徽章: ${data.badgeName ?? ""}';
       case NotificationType.linked:
         return '$username 链接了你的帖子';
-      case NotificationType.watchingFirstPost:
-        return '$username 发布了你关注话题的首帖';
-      case NotificationType.bookmarkReminder:
-        return '书签提醒';
+      case NotificationType.edited:
+        return '$username 编辑了帖子';
+      case NotificationType.movedPost:
+        return '$username 移动了帖子';
       case NotificationType.groupMentioned:
-        return '群组 ${data.groupName ?? ""} 被提及';
-      case NotificationType.following:
-        return '$username 开始关注你';
+        return '$username @${data.groupName ?? ""}';
+      case NotificationType.watchingFirstPost:
+        return '新建话题';
       case NotificationType.followingCreatedTopic:
         return '$username 创建了新话题';
       case NotificationType.followingReplied:
@@ -229,12 +272,8 @@ class DiscourseNotification {
         return '$username 邀请你参与话题';
       case NotificationType.invitedToPrivateMessage:
         return '$username 邀请你参与私信';
-      case NotificationType.inviteeAccepted:
-        return '$username 接受了你的邀请';
-      case NotificationType.movedPost:
-        return '帖子已被移动';
-      case NotificationType.linkedConsolidated:
-        return '$username 链接了你的帖子';
+      case NotificationType.bookmarkReminder:
+        return '书签提醒';
       case NotificationType.topicReminder:
         return '话题提醒';
       case NotificationType.reaction:
@@ -262,27 +301,29 @@ class DiscourseNotification {
       case NotificationType.questionAnswerUserCommented:
         return '$username 评论了问答';
       case NotificationType.watchingCategoryOrTag:
-        return '你关注的分类或标签有新内容';
-      case NotificationType.newFeatures:
-        return '新功能发布';
-      case NotificationType.adminProblems:
-        return '管理员问题提醒';
-      case NotificationType.circlesActivity:
-        return '圈子有新动态';
-      case NotificationType.edited:
-        return '$username 编辑了帖子';
-      case NotificationType.custom:
-        return '自定义通知';
-      case NotificationType.groupMessageSummary:
-        return '群组消息摘要';
+        return '$username 发布了新帖子';
       case NotificationType.postApproved:
         return '你的帖子已被批准';
       case NotificationType.codeReviewCommitApproved:
         return '代码审核已通过';
+      case NotificationType.custom:
+        return '自定义通知';
+      case NotificationType.circlesActivity:
+        return '圈子有新动态';
+
+      // === 非话题类通知：标题已包含完整信息，描述使用类型标签 ===
+      case NotificationType.grantedBadge:
+      case NotificationType.inviteeAccepted:
+      case NotificationType.following:
+      case NotificationType.likedConsolidated:
+      case NotificationType.linkedConsolidated:
+      case NotificationType.groupMessageSummary:
       case NotificationType.membershipRequestAccepted:
-        return '你的成员申请已被接受';
       case NotificationType.membershipRequestConsolidated:
-        return '成员申请汇总';
+      case NotificationType.newFeatures:
+      case NotificationType.adminProblems:
+        return notificationType.label;
+
       default:
         if (username.isNotEmpty) return username;
         return notificationType.label;
