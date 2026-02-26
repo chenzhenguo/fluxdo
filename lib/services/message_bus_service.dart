@@ -55,10 +55,11 @@ class MessageBusService {
   
   bool _isPolling = false;
   bool _shouldStop = false;
-  bool _backgroundMode = false; // 后台模式：只轮询通知频道
+  bool _backgroundMode = false; // 后台模式：使用更长的轮询间隔
   CancelToken? _currentCancelToken; // 当前请求的 CancelToken
   int _failureCount = 0;
   static const int _maxBackoffSeconds = 30;
+  static const Duration _backgroundPollInterval = Duration(seconds: 60);
 
   // 消息流（用于全局监听）
   final _messageController = StreamController<MessageBusMessage>.broadcast();
@@ -153,25 +154,37 @@ class MessageBusService {
     _currentCancelToken = null;
   }
 
+  /// 可被 CancelToken 中断的延迟
+  Future<void> _cancelableDelay(Duration duration, CancelToken cancelToken) {
+    final completer = Completer<void>();
+    final timer = Timer(duration, () {
+      if (!completer.isCompleted) completer.complete();
+    });
+    cancelToken.whenCancel.then((_) {
+      timer.cancel();
+      if (!completer.isCompleted) completer.complete();
+    });
+    return completer.future;
+  }
+
   /// 执行长轮询（流式处理）
   Future<void> _poll() async {
     while (!_shouldStop && _subscriptions.isNotEmpty) {
       _currentCancelToken = CancelToken();
 
       try {
-        final payload = <String, String>{};
-        for (final sub in _subscriptions.values) {
-          // 后台模式只轮询通知提醒频道
-          if (_backgroundMode && !sub.channel.startsWith('/notification-alert/')) {
+        // 后台模式使用更长的轮询间隔（对齐 Discourse backgroundCallbackInterval）
+        if (_backgroundMode) {
+          await _cancelableDelay(_backgroundPollInterval, _currentCancelToken!);
+          if (_shouldStop || (_currentCancelToken?.isCancelled ?? false)) {
+            if (_shouldStop) break;
             continue;
           }
-          payload[sub.channel] = sub.lastMessageId.toString();
         }
 
-        if (payload.isEmpty) {
-          // 后台模式下没有通知频道，等待退出后台
-          await Future.delayed(const Duration(seconds: 5));
-          continue;
+        final payload = <String, String>{};
+        for (final sub in _subscriptions.values) {
+          payload[sub.channel] = sub.lastMessageId.toString();
         }
 
         debugPrint('[MessageBus] 发起轮询: $payload');
@@ -227,6 +240,7 @@ class MessageBusService {
             break;
           }
           debugPrint('[MessageBus] 请求已取消，重新轮询');
+          await Future.delayed(const Duration(milliseconds: 100));
           continue;
         }
 
@@ -328,23 +342,21 @@ class MessageBusService {
   /// 当前是否正在轮询
   bool get isPolling => _isPolling;
 
-  /// 进入后台模式：只轮询 /notification-alert/ 频道
+  /// 进入后台模式：使用更长的轮询间隔（不取消当前请求）
   void enterBackgroundMode() {
     if (_backgroundMode) return;
     _backgroundMode = true;
-    debugPrint('[MessageBus] 进入后台模式，只保留通知频道');
-    if (_isPolling) {
-      _currentCancelToken?.cancel();
-    }
+    debugPrint('[MessageBus] 进入后台模式，轮询间隔 ${_backgroundPollInterval.inSeconds}s');
   }
 
-  /// 退出后台模式：恢复轮询所有频道
+  /// 退出后台模式：取消当前请求以立即重新轮询
   void exitBackgroundMode() {
     if (!_backgroundMode) return;
     _backgroundMode = false;
-    debugPrint('[MessageBus] 退出后台模式，恢复所有频道');
     _failureCount = 0;
+    debugPrint('[MessageBus] 退出后台模式，立即恢复轮询');
     if (_isPolling) {
+      // 取消可能正在等待的后台间隔延迟或长轮询请求，立即重新轮询
       _currentCancelToken?.cancel();
     } else if (_subscriptions.isNotEmpty) {
       _startPolling();
