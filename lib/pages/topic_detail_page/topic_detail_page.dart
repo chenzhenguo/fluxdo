@@ -709,8 +709,18 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
                 _currentPageNotifier.value = page;
               },
               children: [
-                _KeepAlivePage(child: topicScaffold),
-                _KeepAlivePage(child: AiChatPage(topicId: widget.topicId, detail: detail)),
+                _KeepAlivePage(
+                  child: _KeyboardGuard(
+                    isActive: currentPage == 0,
+                    child: topicScaffold,
+                  ),
+                ),
+                _KeepAlivePage(
+                  child: _KeyboardGuard(
+                    isActive: currentPage == 1,
+                    child: AiChatPage(topicId: widget.topicId, detail: detail),
+                  ),
+                ),
               ],
             ),
           );
@@ -1000,6 +1010,26 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
       child: scrollView,
     );
 
+  }
+}
+
+/// 非活跃页面移除键盘 viewInsets，防止键盘弹出时影响不可见的页面布局
+class _KeyboardGuard extends StatelessWidget {
+  final bool isActive;
+  final Widget child;
+  const _KeyboardGuard({required this.isActive, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final data = MediaQuery.of(context);
+    return MediaQuery(
+      data: isActive
+          ? data
+          : data.copyWith(
+              viewInsets: data.viewInsets.copyWith(bottom: 0),
+            ),
+      child: child,
+    );
   }
 }
 
