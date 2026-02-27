@@ -255,6 +255,13 @@ extension _UserActions on _TopicDetailPageState {
       topicId: widget.topicId,
     );
 
+    // 预加载草稿
+    final draftKey = Draft.replyKey(
+      widget.topicId,
+      replyToPostNumber: post.postNumber,
+    );
+    final preloadedDraftFuture = DiscourseService().getDraft(draftKey);
+
     // 打开回复框，预填引用内容（回复给被引用的帖子）
     final newPost = await showReplySheet(
       context: context,
@@ -262,6 +269,7 @@ extension _UserActions on _TopicDetailPageState {
       categoryId: detail?.categoryId,
       replyToPost: post,
       initialContent: quote,
+      preloadedDraftFuture: preloadedDraftFuture,
     );
 
     if (newPost != null && mounted) {

@@ -751,7 +751,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
       return _wrapWithConstraint(PostListSkeleton(withHeader: showHeaderSkeleton));
     }
     
-    if (detailAsync.isLoading && detail == null && !detailAsync.hasError) {
+    if (detailAsync.isLoading && detail == null) {
       final showHeaderSkeleton = widget.scrollToPostNumber == null || widget.scrollToPostNumber == 0;
       return _wrapWithConstraint(PostListSkeleton(withHeader: showHeaderSkeleton));
     }
