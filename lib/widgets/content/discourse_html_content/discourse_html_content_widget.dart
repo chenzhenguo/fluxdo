@@ -23,6 +23,7 @@ import 'builders/poll_builder.dart';
 import 'builders/math_builder.dart';
 import 'builders/chat_transcript_builder.dart';
 import 'builders/iframe_builder.dart';
+import 'builders/lazy_video_builder.dart';
 import 'builders/image_grid_builder.dart';
 import 'builders/combined_decorator_overlay.dart';
 import 'builders/mention_builder.dart';
@@ -447,6 +448,16 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
     if (element.localName == 'iframe') {
       final iframe = buildIframe(context: context, element: element);
       if (iframe != null) return iframe;
+    }
+
+    // 处理 Discourse 懒加载视频 (div.lazy-video-container)
+    if (element.localName == 'div' && element.classes.contains('lazy-video-container')) {
+      return buildLazyVideo(
+        context: context,
+        theme: theme,
+        element: element,
+        linkCounts: widget.linkCounts,
+      );
     }
 
     // 屏蔽 Discourse Lightbox 的元数据区域和图标
