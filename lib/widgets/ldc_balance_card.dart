@@ -6,12 +6,16 @@ import '../services/network/exceptions/oauth_exception.dart';
 
 class LdcBalanceCard extends ConsumerWidget {
   final bool compact;
+  final bool inline;
+  final bool showDivider;
   final VoidCallback? onDisable;
   final VoidCallback? onReauthorize;
 
   const LdcBalanceCard({
     super.key,
     this.compact = false,
+    this.inline = false,
+    this.showDivider = false,
     this.onDisable,
     this.onReauthorize,
   });
@@ -29,6 +33,103 @@ class LdcBalanceCard extends ConsumerWidget {
     if (userInfo == null) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
+
+    if (inline) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => WebViewPage.open(
+            context,
+            'https://credit.linux.do/home',
+            title: 'LINUX DO Credits',
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        size: 20,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'LDC 余额',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            userInfo.availableBalance,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.trending_up_rounded,
+                            size: 14,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '+${userInfo.dailyIncome}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+              if (showDivider)
+                Padding(
+                  padding: const EdgeInsets.only(left: 56),
+                  child: Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (compact) {
       return GestureDetector(
@@ -248,6 +349,81 @@ class LdcBalanceCard extends ConsumerWidget {
   Widget _buildErrorCard(BuildContext context, WidgetRef ref, Object error) {
     final theme = Theme.of(context);
     final isExpired = error is OAuthExpiredException;
+
+    if (inline) {
+      return Material(
+        color: Colors.transparent,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isExpired
+                          ? theme.colorScheme.error.withValues(alpha: 0.1)
+                          : theme.colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isExpired ? Icons.lock_clock_rounded : Icons.error_outline_rounded,
+                      size: 20,
+                      color: isExpired
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'LDC 余额',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          isExpired ? '授权已过期' : '加载失败',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isExpired
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isExpired && onReauthorize != null)
+                    TextButton(
+                      onPressed: onReauthorize,
+                      child: const Text('重新授权'),
+                    )
+                  else
+                    TextButton(
+                      onPressed: () => ref.read(ldcUserInfoProvider.notifier).refresh(),
+                      child: const Text('重试'),
+                    ),
+                ],
+              ),
+            ),
+            if (showDivider)
+              Padding(
+                padding: const EdgeInsets.only(left: 56),
+                child: Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
 
     if (compact) {
       return Card(

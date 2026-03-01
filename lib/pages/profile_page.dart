@@ -25,10 +25,10 @@ import '../providers/app_state_refresher.dart';
 import 'metaverse_page.dart';
 import 'package:ai_model_manager/ai_model_manager.dart';
 import 'drafts_page.dart';
-import '../widgets/ldc_balance_card.dart';
 import '../providers/ldc_providers.dart';
-import '../widgets/cdk_balance_card.dart';
+import '../widgets/ldc_balance_card.dart';
 import '../providers/cdk_providers.dart';
+import '../widgets/cdk_balance_card.dart';
 import '../services/ldc_oauth_service.dart';
 import '../services/cdk_oauth_service.dart';
 import '../services/toast_service.dart';
@@ -304,32 +304,39 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             Consumer(
               builder: (context, ref, _) {
                 final ldcState = ref.watch(ldcUserInfoProvider);
-                final hasError = ldcState.hasError && !ldcState.hasValue;
-                final hasData = ldcState.value != null;
-                if (!hasError && !hasData) return const SizedBox.shrink();
-                return Column(
-                  children: [
-                    LdcBalanceCard(
-                      compact: true,
-                      onReauthorize: () => _reauthorizeLdc(),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                );
-              },
-            ),
-
-            Consumer(
-              builder: (context, ref, _) {
                 final cdkState = ref.watch(cdkUserInfoProvider);
-                final hasError = cdkState.hasError && !cdkState.hasValue;
-                final hasData = cdkState.value != null;
-                if (!hasError && !hasData) return const SizedBox.shrink();
+
+                final showLdc = (ldcState.hasError && !ldcState.hasValue) || ldcState.value != null;
+                final showCdk = (cdkState.hasError && !cdkState.hasValue) || cdkState.value != null;
+
+                if (!showLdc && !showCdk) return const SizedBox.shrink();
+
                 return Column(
                   children: [
-                    CdkBalanceCard(
-                      compact: true,
-                      onReauthorize: () => _reauthorizeCdk(),
+                    Card(
+                      elevation: 0,
+                      color: theme.colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
+                      ),
+                      margin: EdgeInsets.zero,
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          if (showLdc)
+                            LdcBalanceCard(
+                              inline: true,
+                              onReauthorize: () => _reauthorizeLdc(),
+                              showDivider: showCdk,
+                            ),
+                          if (showCdk)
+                            CdkBalanceCard(
+                              inline: true,
+                              onReauthorize: () => _reauthorizeCdk(),
+                            ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -438,7 +445,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ),
     );
   }
-  
+
   Widget _buildOptionsCard(ThemeData theme) {
     return Card(
       elevation: 0,
