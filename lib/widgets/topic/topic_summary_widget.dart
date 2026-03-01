@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/topic.dart';
+import '../../pages/topic_detail_page/topic_detail_page.dart';
 import '../../providers/discourse_providers.dart';
 import '../common/relative_time_text.dart';
+import '../markdown_editor/markdown_renderer.dart';
 
 /// 话题 AI 摘要组件
 class TopicSummaryWidget extends ConsumerWidget {
   final int topicId;
+  /// 跳转到当前话题的指定帖子
+  final void Function(int postNumber)? onJumpToPost;
 
   const TopicSummaryWidget({
     super.key,
     required this.topicId,
+    this.onJumpToPost,
   });
 
   @override
@@ -203,13 +208,26 @@ class TopicSummaryWidget extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // 摘要内容
-          SelectableText(
-            summary.summarizedText,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              height: 1.6,
-              color: theme.colorScheme.onSurface,
-            ),
+          // 摘要内容（Markdown 渲染）
+          MarkdownBody(
+            data: summary.summarizedText,
+            onInternalLinkTap: (linkTopicId, topicSlug, postNumber) {
+              if (linkTopicId == topicId && postNumber != null && onJumpToPost != null) {
+                // 当前话题链接 → 跳转到对应帖子
+                onJumpToPost!(postNumber);
+              } else {
+                // 其他话题链接 → 打开新的话题详情页
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TopicDetailPage(
+                      topicId: linkTopicId,
+                      initialTitle: topicSlug,
+                      scrollToPostNumber: postNumber,
+                    ),
+                  ),
+                );
+              }
+            },
           ),
           const SizedBox(height: 12),
           // 底部信息
@@ -253,12 +271,15 @@ class CollapsibleTopicSummary extends ConsumerStatefulWidget {
   final int topicId;
   final TopicDetail? topicDetail;  // 新增：传入话题详情以检查 summarizable
   final Widget? headerExtra; // 新增：头部额外组件（如订阅按钮）
+  /// 跳转到当前话题的指定帖子
+  final void Function(int postNumber)? onJumpToPost;
 
   const CollapsibleTopicSummary({
     super.key,
     required this.topicId,
     this.topicDetail,
     this.headerExtra,
+    this.onJumpToPost,
   });
 
   @override
@@ -395,7 +416,10 @@ class _CollapsibleTopicSummaryState
           child: _hasRequested
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: TopicSummaryWidget(topicId: widget.topicId),
+                  child: TopicSummaryWidget(
+                    topicId: widget.topicId,
+                    onJumpToPost: widget.onJumpToPost,
+                  ),
                 )
               : const SizedBox(width: double.infinity),
         ),

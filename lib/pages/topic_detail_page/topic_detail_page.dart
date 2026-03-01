@@ -853,6 +853,7 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
                                 headerKey: null,
                                 onVoteChanged: _handleVoteChanged,
                                 onNotificationLevelChanged: (level) => _handleNotificationLevelChanged(notifier, level),
+                                onJumpToPost: _scrollToPost,
                               ),
                             ),
                           ),

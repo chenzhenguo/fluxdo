@@ -9,8 +9,10 @@ import '../../constants.dart';
 /// 再用 DiscourseHtmlContent 渲染，保持与帖子显示样式一致
 class MarkdownBody extends StatelessWidget {
   final String data;
-  
-  const MarkdownBody({super.key, required this.data});
+  /// 内部链接点击回调（话题链接）
+  final void Function(int topicId, String? topicSlug, int? postNumber)? onInternalLinkTap;
+
+  const MarkdownBody({super.key, required this.data, this.onInternalLinkTap});
   
   @override
   Widget build(BuildContext context) {
@@ -68,6 +70,7 @@ class MarkdownBody extends StatelessWidget {
       textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
         height: 1.5,
       ),
+      onInternalLinkTap: onInternalLinkTap,
     );
   }
   
