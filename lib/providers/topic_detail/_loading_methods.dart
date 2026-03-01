@@ -58,7 +58,7 @@ extension LoadingMethods on TopicDetailNotifier {
         _hasMoreBefore = newFirstIndex > 0;
 
         return currentDetail.copyWith(
-          postStream: PostStream(posts: mergedPosts, stream: mergedStream),
+          postStream: PostStream(posts: mergedPosts, stream: mergedStream, gaps: currentDetail.postStream.gaps),
         );
       });
     } finally {
@@ -120,7 +120,7 @@ extension LoadingMethods on TopicDetailNotifier {
         _hasMoreAfter = newLastIndex < mergedStream.length - 1;
 
         return currentDetail.copyWith(
-          postStream: PostStream(posts: mergedPosts, stream: mergedStream),
+          postStream: PostStream(posts: mergedPosts, stream: mergedStream, gaps: currentDetail.postStream.gaps),
         );
       });
     } finally {
@@ -153,6 +153,7 @@ extension LoadingMethods on TopicDetailNotifier {
             postStream: PostStream(
               posts: currentPosts,
               stream: newDetail.postStream.stream,
+              gaps: currentDetail.postStream.gaps,
             ),
           ));
           _updateBoundaryState(currentPosts, newDetail.postStream.stream);
@@ -202,7 +203,7 @@ extension LoadingMethods on TopicDetailNotifier {
 
       state = AsyncValue.data(currentDetail.copyWith(
         postsCount: newDetail.postsCount,
-        postStream: PostStream(posts: mergedPosts, stream: mergedStream),
+        postStream: PostStream(posts: mergedPosts, stream: mergedStream, gaps: currentDetail.postStream.gaps),
         canVote: newDetail.canVote,
         voteCount: newDetail.voteCount,
         userVoted: newDetail.userVoted,
@@ -285,7 +286,7 @@ extension LoadingMethods on TopicDetailNotifier {
       _updateBoundaryState(mergedPosts, mergedStream);
 
       state = AsyncValue.data(currentDetail.copyWith(
-        postStream: PostStream(posts: mergedPosts, stream: mergedStream),
+        postStream: PostStream(posts: mergedPosts, stream: mergedStream, gaps: currentDetail.postStream.gaps),
       ));
 
       return mergedPosts.indexWhere((p) => p.postNumber == postNumber);

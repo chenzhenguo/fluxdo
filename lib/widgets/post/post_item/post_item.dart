@@ -30,6 +30,7 @@ class PostItem extends ConsumerStatefulWidget {
   final String? bottomDateSeparatorLabel;
   final void Function(String selectedText, Post post)? onQuoteSelection;
   final void Function(String quote, Post post)? onQuoteImage;
+  final void Function(int postId)? onExpandHiddenPost;
 
   const PostItem({
     super.key,
@@ -50,6 +51,7 @@ class PostItem extends ConsumerStatefulWidget {
     this.bottomDateSeparatorLabel,
     this.onQuoteSelection,
     this.onQuoteImage,
+    this.onExpandHiddenPost,
   });
 
   @override
@@ -170,6 +172,35 @@ class _PostItemState extends ConsumerState<PostItem> {
                 ),
               ),
             ),
+            // 举报隐藏帖子：显示展开按钮
+            if (post.cookedHidden && post.canSeeHiddenPost && widget.onExpandHiddenPost != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: InkWell(
+                  onTap: () => widget.onExpandHiddenPost!(post.id),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.visibility_outlined,
+                          size: 15,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '查看隐藏的信息',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             PostFooterSection(
               post: post,
               topicId: widget.topicId,

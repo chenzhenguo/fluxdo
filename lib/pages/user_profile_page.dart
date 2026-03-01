@@ -23,6 +23,7 @@ import '../widgets/content/collapsed_html_content.dart';
 import '../widgets/post/reply_sheet.dart';
 import '../widgets/user/user_profile_skeleton.dart';
 import '../widgets/badge/badge_ui_utils.dart';
+import '../services/toast_service.dart';
 import '../models/badge.dart' as badge_model;
 import 'topic_detail_page/topic_detail_page.dart';
 import 'search_page.dart';
@@ -52,6 +53,9 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
   // 关注状态
   bool _isFollowed = false;
   bool _isFollowLoading = false;
+
+  // 订阅级别: normal / mute / ignore
+  String _notificationLevel = 'normal';
 
   // 各 tab 的数据（key 为 filter 字符串）
   final Map<String, List<UserAction>> _actionsCache = {};
@@ -122,6 +126,11 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
           _user = user;
           _summary = results[1] as UserSummary;
           _isFollowed = user.isFollowed ?? false;
+          _notificationLevel = user.ignored == true
+              ? 'ignore'
+              : user.muted == true
+                  ? 'mute'
+                  : 'normal';
           _isLoading = false;
         });
         // 总结 tab 数据已从 _summary 获取，无需额外加载
@@ -195,6 +204,142 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
       anonymousShare: prefs.anonymousShare,
     );
     SharePlus.instance.share(ShareParams(text: url));
+  }
+
+  /// 设置用户订阅级别
+  Future<void> _setNotificationLevel(String level) async {
+    if (_user == null) return;
+
+    // 如果是 ignore，需要先选择时长
+    if (level == 'ignore') {
+      final expiringAt = await _showIgnoreDurationPicker();
+      if (expiringAt == null) return; // 用户取消
+
+      final oldLevel = _notificationLevel;
+      setState(() => _notificationLevel = 'ignore');
+      try {
+        final service = ref.read(discourseServiceProvider);
+        await service.updateUserNotificationLevel(
+          _user!.username,
+          level: 'ignore',
+          expiringAt: expiringAt,
+        );
+        if (mounted) {
+          setState(() {
+            _user = _user!.copyWith(muted: false, ignored: true);
+          });
+          ToastService.showSuccess('已设置为忽略');
+        }
+      } catch (_) {
+        if (mounted) setState(() => _notificationLevel = oldLevel);
+      }
+      return;
+    }
+
+    final oldLevel = _notificationLevel;
+    setState(() => _notificationLevel = level);
+    try {
+      final service = ref.read(discourseServiceProvider);
+      await service.updateUserNotificationLevel(_user!.username, level: level);
+      if (mounted) {
+        setState(() {
+          _user = _user!.copyWith(
+            muted: level == 'mute',
+            ignored: false,
+          );
+        });
+        final label = level == 'mute' ? '已设置为免打扰' : '已恢复常规通知';
+        ToastService.showSuccess(label);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _notificationLevel = oldLevel);
+    }
+  }
+
+  /// 显示忽略时长选择弹窗，返回 expiringAt 时间字符串
+  Future<String?> _showIgnoreDurationPicker() async {
+    // 与 Discourse 前端 extendedDefaultTimeShortcuts 保持一致
+    final now = DateTime.now();
+    const weekdays = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+    String formatTarget(DateTime target) {
+      // 永久不显示时间
+      if (target.year - now.year > 100) return '';
+      final h = target.hour.toString().padLeft(2, '0');
+      final m = target.minute.toString().padLeft(2, '0');
+      final time = '$h:$m';
+      // 同一天只显示时间
+      if (target.day == now.day && target.month == now.month && target.year == now.year) {
+        return time;
+      }
+      // 同年显示 月日 周几 时间
+      if (target.year == now.year) {
+        return '${target.month}月${target.day}日 ${weekdays[target.weekday]} $time';
+      }
+      // 跨年显示完整日期
+      return '${target.year}年${target.month}月${target.day}日 $time';
+    }
+
+    final options = <(String, Duration)>[
+      if (now.hour < 18)
+        ('今天稍后', Duration(hours: 18 - now.hour)),
+      ('明天', Duration(days: 1)),
+      if (now.weekday <= DateTime.wednesday)
+        ('本周稍后', Duration(days: DateTime.thursday - now.weekday)),
+      ('下周一', Duration(days: (DateTime.monday - now.weekday + 7) % 7 == 0 ? 7 : (DateTime.monday - now.weekday + 7) % 7)),
+      ('两周', Duration(days: 14)),
+      ('下个月', Duration(days: 30)),
+      ('两个月', Duration(days: 60)),
+      ('三个月', Duration(days: 90)),
+      ('四个月', Duration(days: 120)),
+      ('六个月', Duration(days: 180)),
+      ('一年', Duration(days: 365)),
+      ('永久', Duration(days: 365000)),
+    ];
+
+    return showModalBottomSheet<String>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  '选择忽略时长',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              const Divider(),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: options.map((option) {
+                    final target = now.add(option.$2);
+                    final desc = formatTarget(target);
+                    return ListTile(
+                      title: Text(option.$1),
+                      trailing: desc.isNotEmpty
+                          ? Text(desc, style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ))
+                          : null,
+                      onTap: () {
+                        final expiry = DateTime.now().toUtc().add(option.$2);
+                        Navigator.pop(context, expiry.toIso8601String());
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   /// 显示用户详细信息弹窗
@@ -562,8 +707,15 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (value) {
-            if (value == 'share') {
-              _shareUser();
+            switch (value) {
+              case 'share':
+                _shareUser();
+              case 'level_normal':
+                _setNotificationLevel('normal');
+              case 'level_mute':
+                _setNotificationLevel('mute');
+              case 'level_ignore':
+                _setNotificationLevel('ignore');
             }
           },
           itemBuilder: (context) {
@@ -579,6 +731,48 @@ class _UserProfilePageState extends ConsumerState<UserProfilePage>
                   ],
                 ),
               ),
+              // 非自己才显示订阅级别选项
+              if (!isOwnProfile && _user != null) ...[
+                const PopupMenuDivider(),
+                PopupMenuItem<String>(
+                  value: 'level_normal',
+                  child: Row(
+                    children: [
+                      Icon(Icons.notifications_outlined, size: 20, color: theme.colorScheme.onSurface),
+                      const SizedBox(width: 12),
+                      const Expanded(child: Text('常规')),
+                      if (_notificationLevel == 'normal')
+                        Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                    ],
+                  ),
+                ),
+                if (_user!.canMuteUser != false)
+                  PopupMenuItem<String>(
+                    value: 'level_mute',
+                    child: Row(
+                      children: [
+                        Icon(Icons.notifications_off_outlined, size: 20, color: theme.colorScheme.onSurface),
+                        const SizedBox(width: 12),
+                        const Expanded(child: Text('免打扰')),
+                        if (_notificationLevel == 'mute')
+                          Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                      ],
+                    ),
+                  ),
+                if (_user!.canIgnoreUser == true)
+                  PopupMenuItem<String>(
+                    value: 'level_ignore',
+                    child: Row(
+                      children: [
+                        Icon(Icons.visibility_off_outlined, size: 20, color: theme.colorScheme.onSurface),
+                        const SizedBox(width: 12),
+                        const Expanded(child: Text('已忽略')),
+                        if (_notificationLevel == 'ignore')
+                          Icon(Icons.check, size: 18, color: theme.colorScheme.primary),
+                      ],
+                    ),
+                  ),
+              ],
             ];
           },
         ),

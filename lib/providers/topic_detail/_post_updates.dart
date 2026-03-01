@@ -34,7 +34,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
       newPosts[index] = finalPost;
 
       state = AsyncValue.data(currentDetail.copyWith(
-        postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream),
+        postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream, gaps: currentDetail.postStream.gaps),
       ));
     } catch (e) {
       debugPrint('[TopicDetail] 刷新帖子 $postId 失败: $e');
@@ -55,7 +55,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
 
     state = AsyncValue.data(currentDetail.copyWith(
       postsCount: currentDetail.postsCount - 1,
-      postStream: PostStream(posts: newPosts, stream: newStream),
+      postStream: PostStream(posts: newPosts, stream: newStream, gaps: currentDetail.postStream.gaps),
     ));
   }
 
@@ -114,7 +114,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
     }
 
     state = AsyncValue.data(currentDetail.copyWith(
-      postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream),
+      postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream, gaps: currentDetail.postStream.gaps),
       hasAcceptedAnswer: accepted,
       acceptedAnswerPostNumber: acceptedPostNumber,
     ));
@@ -153,13 +153,13 @@ extension PostUpdateMethods on TopicDetailNotifier {
 
       state = AsyncValue.data(currentDetail.copyWith(
         postsCount: newPostsCount,
-        postStream: PostStream(posts: newPosts, stream: newStream),
+        postStream: PostStream(posts: newPosts, stream: newStream, gaps: currentDetail.postStream.gaps),
       ));
       return true;
     } else {
       state = AsyncValue.data(currentDetail.copyWith(
         postsCount: currentDetail.postsCount + 1,
-        postStream: PostStream(posts: updatedPosts, stream: newStream),
+        postStream: PostStream(posts: updatedPosts, stream: newStream, gaps: currentDetail.postStream.gaps),
       ));
       return false;
     }
@@ -178,7 +178,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
     newPosts[index] = post;
 
     state = AsyncValue.data(currentDetail.copyWith(
-      postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream),
+      postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream, gaps: currentDetail.postStream.gaps),
     ));
   }
 
@@ -199,7 +199,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
       if (index != -1) {
         final newPosts = [...currentPosts];
         newPosts[index] = firstPost;
-        updatedPostStream = PostStream(posts: newPosts, stream: currentDetail.postStream.stream);
+        updatedPostStream = PostStream(posts: newPosts, stream: currentDetail.postStream.stream, gaps: currentDetail.postStream.gaps);
       }
     }
 

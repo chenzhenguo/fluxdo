@@ -7,6 +7,7 @@ import 'message_bus/models.dart';
 part 'topic_detail/_loading_methods.dart';
 part 'topic_detail/_filter_methods.dart';
 part 'topic_detail/_post_updates.dart';
+part 'topic_detail/_gap_methods.dart';
 
 /// 话题详情参数
 /// 使用 instanceId 确保每次打开页面都是独立的 provider 实例
@@ -90,7 +91,7 @@ class TopicDetailNotifier extends AsyncNotifier<TopicDetail> {
     newPosts[index] = newPost;
 
     state = AsyncValue.data(currentDetail.copyWith(
-      postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream),
+      postStream: PostStream(posts: newPosts, stream: currentDetail.postStream.stream, gaps: currentDetail.postStream.gaps),
     ));
   }
 

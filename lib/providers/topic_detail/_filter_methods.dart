@@ -118,7 +118,7 @@ extension FilterMethods on TopicDetailNotifier {
         _hasMoreAfter = newLastIndex < stream.length - 1;
 
         return currentDetail.copyWith(
-          postStream: PostStream(posts: mergedPosts, stream: stream),
+          postStream: PostStream(posts: mergedPosts, stream: stream, gaps: currentDetail.postStream.gaps),
         );
       });
     } finally {
@@ -173,7 +173,7 @@ extension FilterMethods on TopicDetailNotifier {
         _hasMoreBefore = newFirstIndex > 0;
 
         return currentDetail.copyWith(
-          postStream: PostStream(posts: mergedPosts, stream: stream),
+          postStream: PostStream(posts: mergedPosts, stream: stream, gaps: currentDetail.postStream.gaps),
         );
       });
     } finally {

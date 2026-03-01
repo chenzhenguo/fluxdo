@@ -156,6 +156,17 @@ mixin _UsersMixin on _DiscourseServiceBase {
     }
   }
 
+  /// 设置用户订阅级别（normal/mute/ignore）
+  Future<void> updateUserNotificationLevel(String username, {
+    required String level,
+    String? expiringAt,
+  }) async {
+    await _dio.put('/u/$username/notification_level.json', data: {
+      'notification_level': level,
+      if (expiringAt != null) 'expiring_at': expiringAt,
+    });
+  }
+
   /// 获取用户浏览历史
   Future<TopicListResponse> getBrowsingHistory({int page = 0}) async {
     final response = await _dio.get(

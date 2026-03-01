@@ -525,6 +525,11 @@ class Post {
   final bool admin;              // 用户是否为管理员
   final bool groupModerator;     // 用户是否为分类群组版主
 
+  // 隐藏状态（举报隐藏）
+  final bool hidden;             // 帖子是否被隐藏
+  final bool cookedHidden;       // cooked 内容是否被替换为隐藏提示
+  final bool canSeeHiddenPost;   // 当前用户是否可以查看隐藏内容
+
   Post({
     required this.id,
     this.name,
@@ -576,6 +581,9 @@ class Post {
     this.moderator = false,
     this.admin = false,
     this.groupModerator = false,
+    this.hidden = false,
+    this.cookedHidden = false,
+    this.canSeeHiddenPost = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -652,6 +660,9 @@ class Post {
       moderator: json['moderator'] as bool? ?? false,
       admin: json['admin'] as bool? ?? false,
       groupModerator: json['group_moderator'] as bool? ?? false,
+      hidden: json['hidden'] as bool? ?? false,
+      cookedHidden: json['cooked_hidden'] as bool? ?? false,
+      canSeeHiddenPost: json['can_see_hidden_post'] as bool? ?? false,
     );
   }
 
@@ -685,11 +696,13 @@ class Post {
           canDelete == other.canDelete &&
           canRecover == other.canRecover &&
           read == other.read &&
+          hidden == other.hidden &&
+          cookedHidden == other.cookedHidden &&
           listEquals(reactions, other.reactions) &&
           currentUserReaction == other.currentUserReaction;
 
   @override
-  int get hashCode => Object.hash(id, cooked, likeCount, bookmarked, acceptedAnswer);
+  int get hashCode => Object.hash(id, cooked, likeCount, bookmarked, acceptedAnswer, hidden);
 
   /// 复制并修改部分字段
   Post copyWith({
@@ -743,6 +756,9 @@ class Post {
     bool? moderator,
     bool? admin,
     bool? groupModerator,
+    bool? hidden,
+    bool? cookedHidden,
+    bool? canSeeHiddenPost,
     bool clearCurrentUserReaction = false,
   }) {
     return Post(
@@ -796,18 +812,51 @@ class Post {
       moderator: moderator ?? this.moderator,
       admin: admin ?? this.admin,
       groupModerator: groupModerator ?? this.groupModerator,
+      hidden: hidden ?? this.hidden,
+      cookedHidden: cookedHidden ?? this.cookedHidden,
+      canSeeHiddenPost: canSeeHiddenPost ?? this.canSeeHiddenPost,
     );
   }
+}
+
+/// 帖子流中的 gaps 数据（拉黑用户的帖子位置）
+class PostStreamGaps {
+  final Map<int, List<int>> before; // {postId: [gapPostIds]}
+  final Map<int, List<int>> after;  // {postId: [gapPostIds]}
+
+  const PostStreamGaps({this.before = const {}, this.after = const {}});
+
+  factory PostStreamGaps.fromJson(Map<String, dynamic> json) {
+    Map<int, List<int>> parseGapMap(Map<String, dynamic>? raw) {
+      if (raw == null) return const {};
+      final result = <int, List<int>>{};
+      for (final entry in raw.entries) {
+        final postId = int.tryParse(entry.key);
+        if (postId != null && entry.value is List) {
+          result[postId] = (entry.value as List).cast<int>();
+        }
+      }
+      return result;
+    }
+    return PostStreamGaps(
+      before: parseGapMap(json['before'] as Map<String, dynamic>?),
+      after: parseGapMap(json['after'] as Map<String, dynamic>?),
+    );
+  }
+
+  bool get isEmpty => before.isEmpty && after.isEmpty;
 }
 
 /// 帖子流信息
 class PostStream {
   final List<Post> posts;
   final List<int> stream; // 所有 post_id 的列表
+  final PostStreamGaps? gaps; // 拉黑用户帖子的 gaps 数据
 
-  PostStream({required this.posts, required this.stream});
+  PostStream({required this.posts, required this.stream, this.gaps});
 
   factory PostStream.fromJson(Map<String, dynamic> json) {
+    final gapsJson = json['gaps'] as Map<String, dynamic>?;
     return PostStream(
       posts: (json['posts'] as List<dynamic>? ?? [])
           .map((e) => Post.fromJson(e as Map<String, dynamic>))
@@ -815,6 +864,7 @@ class PostStream {
       stream: (json['stream'] as List<dynamic>? ?? [])
           .map((e) => e as int)
           .toList(),
+      gaps: gapsJson != null ? PostStreamGaps.fromJson(gapsJson) : null,
     );
   }
 

@@ -958,6 +958,9 @@ class _TopicDetailPageState extends ConsumerState<TopicDetailPage> with WidgetsB
               onQuoteSelection: isLoggedIn ? _handleQuoteSelection : null,
               onQuoteImage: isLoggedIn ? _handleImageQuote : null,
               onScrollNotification: _controller.handleScrollNotification,
+              onFillGapBefore: (postId) => notifier.fillGapBefore(postId),
+              onFillGapAfter: (postId) => notifier.fillGapAfter(postId),
+              onExpandHiddenPost: (postId) => notifier.expandHiddenPost(postId),
             );
           },
         );

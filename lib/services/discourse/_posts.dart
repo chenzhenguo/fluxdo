@@ -333,6 +333,12 @@ mixin _PostsMixin on _DiscourseServiceBase {
         .toList();
   }
 
+  /// 获取隐藏帖子的原始 cooked 内容
+  Future<String> getPostCooked(int postId) async {
+    final response = await _dio.get('/posts/$postId/cooked.json');
+    return (response.data as Map<String, dynamic>)['cooked'] as String;
+  }
+
   /// 追踪链接点击
   void trackClick({
     required String url,

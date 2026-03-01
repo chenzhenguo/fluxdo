@@ -56,6 +56,12 @@ class User {
   // 积分相关
   final int? gamificationScore;
 
+  // 订阅级别相关
+  final bool? muted;           // 当前用户是否已静音该用户
+  final bool? ignored;         // 当前用户是否已忽略该用户
+  final bool? canMuteUser;     // 是否可以静音
+  final bool? canIgnoreUser;   // 是否可以忽略
+
   User({
     required this.id,
     required this.username,
@@ -92,6 +98,10 @@ class User {
     this.canSendPrivateMessages,
     this.canSendPrivateMessageToUser,
     this.gamificationScore,
+    this.muted,
+    this.ignored,
+    this.canMuteUser,
+    this.canIgnoreUser,
   });
 
   User copyWith({
@@ -100,6 +110,8 @@ class User {
     int? allUnreadNotificationsCount,
     int? seenNotificationId,
     int? notificationChannelPosition,
+    bool? muted,
+    bool? ignored,
   }) {
     return User(
       id: id,
@@ -140,6 +152,10 @@ class User {
       canSendPrivateMessages: canSendPrivateMessages,
       canSendPrivateMessageToUser: canSendPrivateMessageToUser,
       gamificationScore: gamificationScore,
+      muted: muted ?? this.muted,
+      ignored: ignored ?? this.ignored,
+      canMuteUser: canMuteUser,
+      canIgnoreUser: canIgnoreUser,
     );
   }
 
@@ -192,6 +208,10 @@ class User {
       canSendPrivateMessages: json['can_send_private_messages'] as bool?,
       canSendPrivateMessageToUser: json['can_send_private_message_to_user'] as bool?,
       gamificationScore: json['gamification_score'] as int?,
+      muted: json['muted'] as bool?,
+      ignored: json['ignored'] as bool?,
+      canMuteUser: json['can_mute_user'] as bool?,
+      canIgnoreUser: json['can_ignore_user'] as bool?,
     );
   }
 

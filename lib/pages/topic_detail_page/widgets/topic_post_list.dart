@@ -52,6 +52,11 @@ class TopicPostList extends StatefulWidget {
   /// 图片引用回调（长按图片 → 引用）
   final void Function(String quote, Post post)? onQuoteImage;
   final bool Function(ScrollNotification) onScrollNotification;
+  /// Gap 回调（拉黑用户帖子加载）
+  final void Function(int postId)? onFillGapBefore;
+  final void Function(int postId)? onFillGapAfter;
+  /// 展开隐藏帖子回调
+  final void Function(int postId)? onExpandHiddenPost;
 
   const TopicPostList({
     super.key,
@@ -82,6 +87,9 @@ class TopicPostList extends StatefulWidget {
     this.onQuoteSelection,
     this.onQuoteImage,
     required this.onScrollNotification,
+    this.onFillGapBefore,
+    this.onFillGapAfter,
+    this.onExpandHiddenPost,
   });
 
   @override
@@ -135,6 +143,9 @@ class _TopicPostListState extends State<TopicPostList> {
   void Function(String quote, Post post)? get onQuoteImage => widget.onQuoteImage;
   bool Function(ScrollNotification) get onScrollNotification => widget.onScrollNotification;
   void Function(Set<int> visiblePostNumbers)? get onVisiblePostsChanged => widget.onVisiblePostsChanged;
+  void Function(int postId)? get onFillGapBefore => widget.onFillGapBefore;
+  void Function(int postId)? get onFillGapAfter => widget.onFillGapAfter;
+  void Function(int postId)? get onExpandHiddenPost => widget.onExpandHiddenPost;
 
   /// 检测当前可见帖子（Eyeline 机制）
   ///
@@ -268,9 +279,25 @@ class _TopicPostListState extends State<TopicPostList> {
     final segments = <_PostRenderSegment>[];
     final postIndexToScrollIndex = <int, int>{};
     final scrollIndexToPostNumber = <int, int>{};
+    final gaps = detail.postStream.gaps;
 
     for (int postIndex = 0; postIndex < posts.length; postIndex++) {
       final post = posts[postIndex];
+
+      // 检查此帖子前面是否有 gap
+      if (gaps != null && gaps.before.containsKey(post.id)) {
+        final gapIds = gaps.before[post.id]!;
+        if (gapIds.isNotEmpty) {
+          scrollIndexToPostNumber[segments.length] = post.postNumber;
+          segments.add(_PostRenderSegment.gapBefore(
+            scrollIndex: segments.length,
+            postIndex: postIndex,
+            post: post,
+            gapCount: gapIds.length,
+          ));
+        }
+      }
+
       final renderData = LongPostRenderData.fromHtml(post.cooked);
       final useLongSegments = renderData.chunks.isNotEmpty;
 
@@ -283,34 +310,47 @@ class _TopicPostListState extends State<TopicPostList> {
           postIndex: postIndex,
           post: post,
         ));
-        continue;
-      }
-
-      scrollIndexToPostNumber[segments.length] = post.postNumber;
-      segments.add(_PostRenderSegment.header(
-        scrollIndex: segments.length,
-        postIndex: postIndex,
-        post: post,
-      ));
-
-      for (final chunk in renderData.chunks) {
+      } else {
         scrollIndexToPostNumber[segments.length] = post.postNumber;
-        segments.add(_PostRenderSegment.chunk(
+        segments.add(_PostRenderSegment.header(
           scrollIndex: segments.length,
           postIndex: postIndex,
           post: post,
-          chunkIndex: chunk.index,
-          chunkData: chunk,
-          renderData: renderData,
+        ));
+
+        for (final chunk in renderData.chunks) {
+          scrollIndexToPostNumber[segments.length] = post.postNumber;
+          segments.add(_PostRenderSegment.chunk(
+            scrollIndex: segments.length,
+            postIndex: postIndex,
+            post: post,
+            chunkIndex: chunk.index,
+            chunkData: chunk,
+            renderData: renderData,
+          ));
+        }
+
+        scrollIndexToPostNumber[segments.length] = post.postNumber;
+        segments.add(_PostRenderSegment.footer(
+          scrollIndex: segments.length,
+          postIndex: postIndex,
+          post: post,
         ));
       }
 
-      scrollIndexToPostNumber[segments.length] = post.postNumber;
-      segments.add(_PostRenderSegment.footer(
-        scrollIndex: segments.length,
-        postIndex: postIndex,
-        post: post,
-      ));
+      // 检查此帖子后面是否有 gap
+      if (gaps != null && gaps.after.containsKey(post.id)) {
+        final gapIds = gaps.after[post.id]!;
+        if (gapIds.isNotEmpty) {
+          scrollIndexToPostNumber[segments.length] = post.postNumber;
+          segments.add(_PostRenderSegment.gapAfter(
+            scrollIndex: segments.length,
+            postIndex: postIndex,
+            post: post,
+            gapCount: gapIds.length,
+          ));
+        }
+      }
     }
 
     _renderSegments = segments;
@@ -530,6 +570,7 @@ class _TopicPostListState extends State<TopicPostList> {
           onSolutionChanged: onSolutionChanged,
           onQuoteSelection: onQuoteSelection,
           onQuoteImage: onQuoteImage,
+          onExpandHiddenPost: onExpandHiddenPost,
         );
         break;
       case _PostRenderSegmentType.longHeader:
@@ -569,6 +610,18 @@ class _TopicPostListState extends State<TopicPostList> {
           onSolutionChanged: onSolutionChanged,
         );
         break;
+      case _PostRenderSegmentType.gapBefore:
+        child = _GapIndicator(
+          count: segment.gapCount,
+          onTap: onFillGapBefore != null ? () => onFillGapBefore!(post.id) : null,
+        );
+        break;
+      case _PostRenderSegmentType.gapAfter:
+        child = _GapIndicator(
+          count: segment.gapCount,
+          onTap: onFillGapAfter != null ? () => onFillGapAfter!(post.id) : null,
+        );
+        break;
     }
 
     final wrapped = _wrapContent(
@@ -591,7 +644,7 @@ class _TopicPostListState extends State<TopicPostList> {
   }
 }
 
-enum _PostRenderSegmentType { shortPost, longHeader, longChunk, longFooter }
+enum _PostRenderSegmentType { shortPost, longHeader, longChunk, longFooter, gapBefore, gapAfter }
 
 class _PostRenderSegment {
   final _PostRenderSegmentType type;
@@ -601,6 +654,7 @@ class _PostRenderSegment {
   final int? chunkIndex;
   final HtmlChunk? chunkData;
   final LongPostRenderData? renderData;
+  final int gapCount; // gap 段中隐藏帖子的数量
 
   const _PostRenderSegment._({
     required this.type,
@@ -610,6 +664,7 @@ class _PostRenderSegment {
     this.chunkIndex,
     this.chunkData,
     this.renderData,
+    this.gapCount = 0,
   });
   factory _PostRenderSegment.shortPost({
     required int scrollIndex,
@@ -666,6 +721,106 @@ class _PostRenderSegment {
       scrollIndex: scrollIndex,
       postIndex: postIndex,
       post: post,
+    );
+  }
+
+  factory _PostRenderSegment.gapBefore({
+    required int scrollIndex,
+    required int postIndex,
+    required Post post,
+    required int gapCount,
+  }) {
+    return _PostRenderSegment._(
+      type: _PostRenderSegmentType.gapBefore,
+      scrollIndex: scrollIndex,
+      postIndex: postIndex,
+      post: post,
+      gapCount: gapCount,
+    );
+  }
+
+  factory _PostRenderSegment.gapAfter({
+    required int scrollIndex,
+    required int postIndex,
+    required Post post,
+    required int gapCount,
+  }) {
+    return _PostRenderSegment._(
+      type: _PostRenderSegmentType.gapAfter,
+      scrollIndex: scrollIndex,
+      postIndex: postIndex,
+      post: post,
+      gapCount: gapCount,
+    );
+  }
+}
+
+/// Gap 指示器 - 显示被隐藏的帖子数量，点击后加载
+class _GapIndicator extends StatefulWidget {
+  final int count;
+  final VoidCallback? onTap;
+
+  const _GapIndicator({required this.count, this.onTap});
+
+  @override
+  State<_GapIndicator> createState() => _GapIndicatorState();
+}
+
+class _GapIndicatorState extends State<_GapIndicator> {
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: _loading ? null : () {
+        setState(() => _loading = true);
+        widget.onTap?.call();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          border: Border(
+            bottom: BorderSide(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_loading)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Icon(
+                  Icons.unfold_more,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            Text(
+              _loading ? '加载中...' : '显示 ${widget.count} 条隐藏回复',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

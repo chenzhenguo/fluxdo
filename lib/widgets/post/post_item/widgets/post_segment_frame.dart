@@ -35,7 +35,7 @@ class PostSegmentFrame extends StatelessWidget {
 
     return RepaintBoundary(
       child: Opacity(
-        opacity: post.isDeleted ? 0.6 : 1.0,
+        opacity: post.isDeleted || post.hidden ? 0.6 : 1.0,
         child: Container(
           constraints: constraints,
           decoration: BoxDecoration(
@@ -128,5 +128,7 @@ Color buildPostTargetColor(ThemeData theme, Post post, bool highlight) {
       ? Color.alphaBlend(highlightColor, backgroundColor)
       : post.isDeleted
           ? theme.colorScheme.errorContainer.withValues(alpha: 0.15)
-          : backgroundColor;
+          : post.hidden
+              ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+              : backgroundColor;
 }
