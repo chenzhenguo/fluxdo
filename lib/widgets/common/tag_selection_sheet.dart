@@ -18,8 +18,14 @@ class TagSelectionSheet extends StatefulWidget {
   /// 最大可选标签数
   final int maxTags;
 
-  /// 最小必选标签数
+  /// 最小必选标签数（仅 filterForInput=true 时有效）
   final int minTags;
+
+  /// 是否为创建话题模式（true=创建话题，false=筛选/浏览）
+  ///
+  /// 创建话题时：发送 filterForInput 给 API，显示必选标签组提示和最小标签数约束
+  /// 筛选浏览时：不发送 filterForInput，不显示必选标签组和最小标签数约束
+  final bool filterForInput;
 
   const TagSelectionSheet({
     super.key,
@@ -28,6 +34,7 @@ class TagSelectionSheet extends StatefulWidget {
     required this.selectedTags,
     this.maxTags = 5,
     this.minTags = 0,
+    this.filterForInput = false,
   });
 
   @override
@@ -90,13 +97,15 @@ class _TagSelectionSheetState extends State<TagSelectionSheet> {
         categoryId: widget.categoryId,
         selectedTags: _currentSelectedTags,
         limit: 8,
+        filterForInput: widget.filterForInput,
       );
 
       if (!mounted) return;
 
       setState(() {
         _searchResults = result.results;
-        _requiredTagGroup = result.requiredTagGroup;
+        // 仅创建话题模式下处理必选标签组
+        _requiredTagGroup = widget.filterForInput ? result.requiredTagGroup : null;
         _isLoading = false;
         _initialized = true;
       });
@@ -139,17 +148,20 @@ class _TagSelectionSheetState extends State<TagSelectionSheet> {
 
     // 构建提示文本
     String hintText;
-    if (_requiredTagGroup != null) {
-      // 有必选标签组要求
+    if (widget.filterForInput && _requiredTagGroup != null) {
+      // 创建话题模式：有必选标签组要求
       hintText = '需从 "${_requiredTagGroup!.name}" 选择至少 ${_requiredTagGroup!.minCount} 个';
-    } else if (widget.minTags > 0) {
+    } else if (widget.filterForInput && widget.minTags > 0) {
       if (_currentSelectedTags.length < widget.minTags) {
         hintText = '搜索标签 (已选 ${_currentSelectedTags.length}, 至少 ${widget.minTags})...';
       } else {
         hintText = '搜索标签 (已选 ${_currentSelectedTags.length}/${widget.maxTags})...';
       }
     } else {
-      hintText = '搜索标签 (已选 ${_currentSelectedTags.length}/${widget.maxTags})...';
+      // 筛选模式或无特殊约束
+      hintText = _currentSelectedTags.isEmpty
+          ? '搜索标签...'
+          : '搜索标签 (已选 ${_currentSelectedTags.length})...';
     }
 
     // 过滤出未选中的标签
@@ -193,8 +205,8 @@ class _TagSelectionSheetState extends State<TagSelectionSheet> {
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    // 必选标签组提示
-                    if (_requiredTagGroup != null)
+                    // 必选标签组提示（仅创建话题模式）
+                    if (widget.filterForInput && _requiredTagGroup != null)
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -243,9 +255,9 @@ class _TagSelectionSheetState extends State<TagSelectionSheet> {
                               decoration: InputDecoration(
                                 hintText: hintText,
                                 hintStyle: TextStyle(
-                                  color: _requiredTagGroup != null
+                                  color: (widget.filterForInput && _requiredTagGroup != null)
                                       ? theme.colorScheme.primary
-                                      : (_currentSelectedTags.length < widget.minTags
+                                      : (widget.filterForInput && _currentSelectedTags.length < widget.minTags
                                           ? theme.colorScheme.error
                                           : theme.colorScheme.onSurfaceVariant),
                                   fontSize: 14,
@@ -253,6 +265,10 @@ class _TagSelectionSheetState extends State<TagSelectionSheet> {
                                 border: InputBorder.none,
                                 isDense: true,
                                 contentPadding: const EdgeInsets.only(left: 0, right: 12),
+                                prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 44,
+                                  minHeight: 44,
+                                ),
                                 prefixIcon: _isLoading
                                     ? const Padding(
                                         padding: EdgeInsets.all(12),

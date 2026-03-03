@@ -376,6 +376,7 @@ class TagsArea extends StatelessWidget {
         selectedTags: selectedTags,
         maxTags: 5,
         minTags: minTags,
+        filterForInput: true,
       ),
     );
 

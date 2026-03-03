@@ -49,16 +49,20 @@ mixin _SearchMixin on _DiscourseServiceBase {
   }
 
   /// 搜索标签
+  ///
+  /// [filterForInput] 为 true 时只返回当前分类允许的标签（创建话题用），
+  /// 为 false 时返回所有标签（筛选/浏览用）。
   Future<TagSearchResult> searchTags({
     String query = '',
     int? categoryId,
     List<String>? selectedTags,
     int? limit,
+    bool filterForInput = false,
   }) async {
     try {
       final queryParams = <String, dynamic>{
         'q': query,
-        'filterForInput': true,
+        if (filterForInput) 'filterForInput': true,
       };
       if (limit != null) {
         queryParams['limit'] = limit;
