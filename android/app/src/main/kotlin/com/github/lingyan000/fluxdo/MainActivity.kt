@@ -18,6 +18,7 @@ class MainActivity : FlutterActivity() {
         window.decorView.requestApplyInsets()
     }
     private val CHANNEL = "com.github.lingyan000.fluxdo/browser"
+    private val CRASHLYTICS_CHANNEL = "com.github.lingyan000.fluxdo/crashlytics"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -32,6 +33,17 @@ class MainActivity : FlutterActivity() {
                     } else {
                         result.error("INVALID_URL", "URL is null", null)
                     }
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CRASHLYTICS_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setCrashlyticsEnabled" -> {
+                    val enable = call.argument<Boolean>("enabled") ?: false
+                    FluxdoApplication.setCrashlytics(enable)
+                    result.success(null)
                 }
                 else -> result.notImplemented()
             }

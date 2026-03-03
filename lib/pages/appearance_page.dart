@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/preferences_provider.dart';
 import '../providers/theme_provider.dart';
 
 class AppearancePage extends ConsumerWidget {
@@ -8,6 +9,7 @@ class AppearancePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeState = ref.watch(themeProvider);
+    final preferences = ref.watch(preferencesProvider);
     final theme = Theme.of(context);
 
     // Color swatches for selection
@@ -39,6 +41,119 @@ class AppearancePage extends ConsumerWidget {
           _buildSectionHeader(theme, '主题色彩', Icons.color_lens_outlined),
           const SizedBox(height: 16),
           _buildColorGrid(context, ref, themeState.seedColor, colorOptions),
+
+          const SizedBox(height: 32),
+
+          _buildSectionHeader(theme, '阅读', Icons.chrome_reader_mode_outlined),
+          const SizedBox(height: 16),
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha:0.2)),
+            ),
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.format_size_rounded,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('内容字体大小'),
+                            Text(
+                              '${(preferences.contentFontScale * 100).round()}%',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: preferences.contentFontScale != 1.0
+                            ? () => ref.read(preferencesProvider.notifier).setContentFontScale(1.0)
+                            : null,
+                        child: const Text('重置'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    ),
+                    child: Slider(
+                      value: preferences.contentFontScale,
+                      min: 0.8,
+                      max: 1.4,
+                      divisions: 12,
+                      label: '${(preferences.contentFontScale * 100).round()}%',
+                      onChanged: (value) {
+                        ref.read(preferencesProvider.notifier).setContentFontScale(value);
+                      },
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '小',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        '大',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha:0.2)),
+            ),
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: SwitchListTile(
+              title: const Text('阅读混排优化'),
+              subtitle: const Text('浏览帖子时自动优化中英文间距'),
+              secondary: Icon(
+                Icons.auto_fix_high_rounded,
+                color: preferences.displayPanguSpacing
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+              value: preferences.displayPanguSpacing,
+              onChanged: (value) {
+                ref.read(preferencesProvider.notifier).setDisplayPanguSpacing(value);
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -93,41 +208,48 @@ class AppearancePage extends ConsumerWidget {
   ) {
     final isDynamic = ref.watch(themeProvider.select((s) => s.useDynamicColor));
     
-    return Center(
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 16,
-        alignment: WrapAlignment.center, // Changed to center
-        children: [
-        // Auto / Dynamic Color Option
-        GestureDetector(
+    final allItems = <Widget>[
+      GestureDetector(
+        onTap: () {
+          ref.read(themeProvider.notifier).setUseDynamicColor(true);
+        },
+        child: _buildColorItem(
+          context,
+          color: Colors.transparent,
+          isSelected: isDynamic,
+          isDynamic: true,
+        ),
+      ),
+      ...options.map((option) {
+        final isSelected = !isDynamic && option.color.toARGB32() == currentColor.toARGB32();
+        return GestureDetector(
           onTap: () {
-             ref.read(themeProvider.notifier).setUseDynamicColor(true);
+            ref.read(themeProvider.notifier).setSeedColor(option.color);
           },
           child: _buildColorItem(
             context,
-            color: Colors.transparent, // Placeholder
-            isSelected: isDynamic,
-            isDynamic: true,
+            color: option.color,
+            isSelected: isSelected,
+            isDynamic: false,
           ),
-        ),
-        // Preset Colors
-        ...options.map((option) {
-          final isSelected = !isDynamic && option.color.toARGB32() == currentColor.toARGB32();
-          return GestureDetector(
-            onTap: () {
-              ref.read(themeProvider.notifier).setSeedColor(option.color);
-            },
-            child: _buildColorItem(
-              context,
-              color: option.color,
-              isSelected: isSelected,
-              isDynamic: false,
-            ),
-          );
-        }),
-        ],
-      ),
+        );
+      }),
+    ];
+
+    // 根据可用宽度计算每行个数，动态分配间距使左右对齐
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const itemSize = 56.0;
+        const minSpacing = 16.0;
+        final crossAxisCount = ((constraints.maxWidth + minSpacing) / (itemSize + minSpacing)).floor();
+        final spacing = (constraints.maxWidth - crossAxisCount * itemSize) / (crossAxisCount - 1);
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 16,
+          children: allItems,
+        );
+      },
     );
   }
 

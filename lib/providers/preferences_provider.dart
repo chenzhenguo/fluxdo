@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +19,8 @@ class AppPreferences {
   final int shareImageThemeIndex;
   /// 自动填充登录凭证
   final bool autoFillLogin;
+  /// 崩溃日志上报（仅 Android）
+  final bool crashlytics;
 
   const AppPreferences({
     required this.autoPanguSpacing,
@@ -26,6 +31,7 @@ class AppPreferences {
     required this.contentFontScale,
     required this.shareImageThemeIndex,
     required this.autoFillLogin,
+    required this.crashlytics,
   });
 
   AppPreferences copyWith({
@@ -37,6 +43,7 @@ class AppPreferences {
     double? contentFontScale,
     int? shareImageThemeIndex,
     bool? autoFillLogin,
+    bool? crashlytics,
   }) {
     return AppPreferences(
       autoPanguSpacing: autoPanguSpacing ?? this.autoPanguSpacing,
@@ -48,6 +55,7 @@ class AppPreferences {
       contentFontScale: contentFontScale ?? this.contentFontScale,
       shareImageThemeIndex: shareImageThemeIndex ?? this.shareImageThemeIndex,
       autoFillLogin: autoFillLogin ?? this.autoFillLogin,
+      crashlytics: crashlytics ?? this.crashlytics,
     );
   }
 }
@@ -62,6 +70,10 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   static const String _contentFontScaleKey = 'pref_content_font_scale';
   static const String _shareImageThemeIndexKey = 'pref_share_image_theme_index';
   static const String _autoFillLoginKey = 'pref_auto_fill_login';
+  static const String _crashlyticsKey = 'pref_crashlytics';
+
+  static const _crashlyticsChannel =
+      MethodChannel('com.github.lingyan000.fluxdo/crashlytics');
 
   PreferencesNotifier(this._prefs)
       : super(
@@ -75,6 +87,7 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
             contentFontScale: _prefs.getDouble(_contentFontScaleKey) ?? 1.0,
             shareImageThemeIndex: _prefs.getInt(_shareImageThemeIndexKey) ?? 0,
             autoFillLogin: _prefs.getBool(_autoFillLoginKey) ?? true,
+            crashlytics: _prefs.getBool(_crashlyticsKey) ?? false,
           ),
         );
 
@@ -120,6 +133,17 @@ class PreferencesNotifier extends StateNotifier<AppPreferences> {
   Future<void> setAutoFillLogin(bool enabled) async {
     state = state.copyWith(autoFillLogin: enabled);
     await _prefs.setBool(_autoFillLoginKey, enabled);
+  }
+
+  Future<void> setCrashlytics(bool enabled) async {
+    state = state.copyWith(crashlytics: enabled);
+    await _prefs.setBool(_crashlyticsKey, enabled);
+    if (Platform.isAndroid) {
+      await _crashlyticsChannel.invokeMethod(
+        'setCrashlyticsEnabled',
+        {'enabled': enabled},
+      );
+    }
   }
 }
 

@@ -72,11 +72,15 @@ Future<void> main() async {
   final prefs = results[0] as SharedPreferences;
 
   // 阶段 2：依赖 prefs 的步骤并行
+  final crashlyticsEnabled = prefs.getBool('pref_crashlytics') ?? false;
   await Future.wait([
     CfChallengeLogger.setEnabled(prefs.getBool('developer_mode') ?? false),
     CronetFallbackService.instance.initialize(prefs),
     NetworkSettingsService.instance.initialize(prefs),
     ProxySettingsService.instance.initialize(prefs),
+    if (Platform.isAndroid && crashlyticsEnabled)
+      const MethodChannel('com.github.lingyan000.fluxdo/crashlytics')
+          .invokeMethod('setCrashlyticsEnabled', {'enabled': true}),
   ]);
 
   // 提前触发预加载数据请求，与 runApp 并行执行
@@ -215,10 +219,7 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
   Timer? _resumeDebounceTimer;
   DateTime? _lastBackPressTime;
 
-  final List<Widget> _pages = const [
-    TopicsScreen(),
-    ProfilePage(),
-  ];
+  static const _profilePage = ProfilePage();
 
   @override
   void initState() {
@@ -418,7 +419,10 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
         destinations: _buildDestinations(user),
         body: IndexedStack(
           index: _currentIndex,
-          children: _pages,
+          children: [
+            TopicsScreen(isActive: _currentIndex == 0),
+            _profilePage,
+          ],
         ),
       ),
     );

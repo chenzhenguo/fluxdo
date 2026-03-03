@@ -74,6 +74,7 @@ jobs:
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
           echo "${{ secrets.ANDROID_KEY_PROPERTIES }}" > android/key.properties
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
 
       - name: Build DOH Proxy
         if: startsWith(matrix.platform, 'android')
