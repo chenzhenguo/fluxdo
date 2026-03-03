@@ -36,6 +36,7 @@ import 'constants.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_model_manager/ai_model_manager.dart';
+import 'providers/preferences_provider.dart';
 import 'providers/theme_provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'widgets/preheat_gate.dart';
@@ -49,46 +50,55 @@ Future<void> main() async {
   // 启用 Edge-to-Edge 模式（小白条沉浸式）
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  // 桌面平台初始化 window_manager（用于视频全屏等窗口控制）
-  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-    await windowManager.ensureInitialized();
-  }
-
-  // 初始化 User-Agent（获取 WebView UA 并移除 wv 标识）
-  await AppConstants.initUserAgent();
-
   // 初始化语法高亮服务（预热 Isolate Worker 和字体）
   HighlighterService.instance.initialize(); // 不需要 await，后台初始化
 
-  // 初始化 SharedPreferences
-  final prefs = await SharedPreferences.getInstance();
-
-  // 初始化 CF 验证日志（仅开发者模式启用）
-  await CfChallengeLogger.setEnabled(prefs.getBool('developer_mode') ?? false);
-
-  // 初始化代理 CA 证书（非 Android 平台）
-  await ProxyCertificate.initialize();
-
-  // 初始化 Cronet 降级服务
-  await CronetFallbackService.instance.initialize(prefs);
-
-  // 初始化网络设置（DoH/代理）
-  await NetworkSettingsService.instance.initialize(prefs);
-
-  // 初始化 HTTP 代理设置
-  await ProxySettingsService.instance.initialize(prefs);
-
-  // 初始化 CookieJar（持久化 Cookie 管理）
-  await CookieJarService().initialize();
-
-  // 初始化 Cookie 同步服务（CSRF token 等）
-  await CookieSyncService().init();
-
   // 初始化本地通知服务（请求权限）
-  LocalNotificationService().initialize();
+  LocalNotificationService().initialize(); // 不需要 await，后台初始化
 
-  // 初始化后台通知服务（Android 前台服务 / iOS BGTaskScheduler）
-  await BackgroundNotificationService().initialize();
+  // 阶段 1：并行执行所有不相互依赖的初始化
+  final futures = <Future<dynamic>>[
+    SharedPreferences.getInstance(),
+    AppConstants.initUserAgent(),
+    ProxyCertificate.initialize(),
+    CookieJarService().initialize(),
+    CookieSyncService().init(),
+    BackgroundNotificationService().initialize(),
+  ];
+  // 桌面平台初始化 window_manager（用于视频全屏等窗口控制）
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    futures.add(windowManager.ensureInitialized());
+  }
+  final results = await Future.wait(futures);
+  final prefs = results[0] as SharedPreferences;
+
+  // 阶段 2：依赖 prefs 的步骤并行
+  final crashlyticsEnabled = prefs.getBool('pref_crashlytics') ?? false;
+  await Future.wait([
+    CfChallengeLogger.setEnabled(prefs.getBool('developer_mode') ?? false),
+    CronetFallbackService.instance.initialize(prefs),
+    NetworkSettingsService.instance.initialize(prefs),
+    ProxySettingsService.instance.initialize(prefs),
+    if (Platform.isAndroid && crashlyticsEnabled)
+      const MethodChannel('com.github.lingyan000.fluxdo/crashlytics')
+          .invokeMethod('setCrashlyticsEnabled', {'enabled': true}),
+  ]);
+
+  // 应用竖屏锁定设置（仅移动端）
+  if (Platform.isIOS || Platform.isAndroid) {
+    final portraitLock = prefs.getBool('pref_portrait_lock') ?? false;
+    if (portraitLock) {
+      PreferencesNotifier.isPortraitLocked = true;
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+  }
+
+  // 提前触发预加载数据请求，与 runApp 并行执行
+  // PreheatGate 中的 ensureLoaded() 会复用这个已在进行的请求
+  PreloadedDataService().ensureLoaded().ignore();
 
   // 注入 AI 模型管理包的消息提示实现
   AiToastDelegate.configure((message, {type = AiToastType.info}) {
@@ -222,10 +232,7 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
   Timer? _resumeDebounceTimer;
   DateTime? _lastBackPressTime;
 
-  final List<Widget> _pages = const [
-    TopicsScreen(),
-    ProfilePage(),
-  ];
+  static const _profilePage = ProfilePage();
 
   @override
   void initState() {
@@ -423,7 +430,13 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
         selectedIndex: _currentIndex,
         onDestinationSelected: _onDestinationSelected,
         destinations: _buildDestinations(user),
-        body: _pages[_currentIndex],
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            TopicsScreen(isActive: _currentIndex == 0),
+            _profilePage,
+          ],
+        ),
       ),
     );
   }

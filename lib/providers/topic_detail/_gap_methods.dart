@@ -19,6 +19,7 @@ extension GapMethods on TopicDetailNotifier {
       final service = ref.read(discourseServiceProvider);
       final newPostStream = await service.getPosts(arg.topicId, gapPostIds);
 
+      if (!ref.mounted) return;
       final updatedDetail = state.value;
       if (updatedDetail == null) return;
 
@@ -83,6 +84,7 @@ extension GapMethods on TopicDetailNotifier {
       final service = ref.read(discourseServiceProvider);
       final newPostStream = await service.getPosts(arg.topicId, gapPostIds);
 
+      if (!ref.mounted) return;
       final updatedDetail = state.value;
       if (updatedDetail == null) return;
 
@@ -158,6 +160,7 @@ extension GapMethods on TopicDetailNotifier {
     try {
       final service = ref.read(discourseServiceProvider);
       final cooked = await service.getPostCooked(postId);
+      if (!ref.mounted) return;
       _updatePostById(postId, (post) => post.copyWith(
         cooked: cooked,
         cookedHidden: false,

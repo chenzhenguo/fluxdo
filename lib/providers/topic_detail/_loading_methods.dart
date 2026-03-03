@@ -18,7 +18,7 @@ extension LoadingMethods on TopicDetailNotifier {
       // ignore: invalid_use_of_internal_member
       state = const AsyncLoading<TopicDetail>().copyWithPrevious(state);
 
-      state = await AsyncValue.guard(() async {
+      final result = await AsyncValue.guard(() async {
         final currentDetail = state.requireValue;
         final currentPosts = currentDetail.postStream.posts;
         final stream = currentDetail.postStream.stream;
@@ -61,6 +61,8 @@ extension LoadingMethods on TopicDetailNotifier {
           postStream: PostStream(posts: mergedPosts, stream: mergedStream, gaps: currentDetail.postStream.gaps),
         );
       });
+      if (!ref.mounted) return;
+      state = result;
     } finally {
       _isLoadingPrevious = false;
     }
@@ -80,7 +82,7 @@ extension LoadingMethods on TopicDetailNotifier {
       // ignore: invalid_use_of_internal_member
       state = const AsyncLoading<TopicDetail>().copyWithPrevious(state);
 
-      state = await AsyncValue.guard(() async {
+      final result = await AsyncValue.guard(() async {
         final currentDetail = state.requireValue;
         final currentPosts = currentDetail.postStream.posts;
         final stream = currentDetail.postStream.stream;
@@ -123,6 +125,8 @@ extension LoadingMethods on TopicDetailNotifier {
           postStream: PostStream(posts: mergedPosts, stream: mergedStream, gaps: currentDetail.postStream.gaps),
         );
       });
+      if (!ref.mounted) return;
+      state = result;
     } finally {
       _isLoadingMore = false;
     }
@@ -148,6 +152,7 @@ extension LoadingMethods on TopicDetailNotifier {
         // 轻量请求：只获取最新话题信息以拿到 stream 和 postsCount
         final newDetail = await service.getTopicDetail(arg.topicId, postNumber: lastPostNumber);
         if (newDetail.postStream.stream.length > currentDetail.postStream.stream.length) {
+          if (!ref.mounted) return;
           state = AsyncValue.data(currentDetail.copyWith(
             postsCount: newDetail.postsCount,
             postStream: PostStream(
@@ -177,6 +182,7 @@ extension LoadingMethods on TopicDetailNotifier {
       final newPosts = newDetail.postStream.posts.where((p) => !existingIds.contains(p.id)).toList();
 
       if (newPosts.isEmpty) return;
+      if (!ref.mounted) return;
 
       // 本地递增被回复帖子的 replyCount（与 Discourse 官方做法一致）
       final replyToNumbers = <int>{};
@@ -221,7 +227,7 @@ extension LoadingMethods on TopicDetailNotifier {
 
     await Future.delayed(Duration.zero);
 
-    state = await AsyncValue.guard(() async {
+    final result = await AsyncValue.guard(() async {
       final service = ref.read(discourseServiceProvider);
       final detail = await service.getTopicDetail(
         arg.topicId,
@@ -234,6 +240,8 @@ extension LoadingMethods on TopicDetailNotifier {
 
       return detail;
     });
+    if (!ref.mounted) return;
+    state = result;
   }
 
   /// 刷新当前话题详情（保持列表可见）
@@ -243,7 +251,7 @@ extension LoadingMethods on TopicDetailNotifier {
     // ignore: invalid_use_of_internal_member
     state = const AsyncLoading<TopicDetail>().copyWithPrevious(state);
 
-    state = await AsyncValue.guard(() async {
+    final result = await AsyncValue.guard(() async {
       final service = ref.read(discourseServiceProvider);
       final detail = await service.getTopicDetail(
         arg.topicId,
@@ -256,6 +264,8 @@ extension LoadingMethods on TopicDetailNotifier {
 
       return detail;
     });
+    if (!ref.mounted) return;
+    state = result;
   }
 
   /// 加载指定楼层的帖子（用于跳转）
@@ -285,6 +295,7 @@ extension LoadingMethods on TopicDetailNotifier {
 
       _updateBoundaryState(mergedPosts, mergedStream);
 
+      if (!ref.mounted) return -1;
       state = AsyncValue.data(currentDetail.copyWith(
         postStream: PostStream(posts: mergedPosts, stream: mergedStream, gaps: currentDetail.postStream.gaps),
       ));

@@ -559,7 +559,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           _buildOptionTile(
             icon: Icons.tune_rounded,
             iconColor: Colors.deepPurple,
-            title: '偏好设置',
+            title: '功能设置',
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PreferencesPage())),
           ),
           _buildOptionTile(

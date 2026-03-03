@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
@@ -92,6 +93,11 @@ class DiscourseHtmlContent extends ConsumerStatefulWidget {
     this.onQuoteImage,
   });
 
+  /// 批量预热 Pangu 混排处理（在 isolate 中执行，避免首次渲染阻塞主线程）
+  static void preloadPangu(List<String> htmlList) {
+    _DiscourseHtmlContentState._preloadPangu(htmlList);
+  }
+
   @override
   ConsumerState<DiscourseHtmlContent> createState() => _DiscourseHtmlContentState();
 }
@@ -99,7 +105,6 @@ class DiscourseHtmlContent extends ConsumerStatefulWidget {
 class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
   late final DiscourseWidgetFactory _widgetFactory;
   late final GalleryInfo _galleryInfo;
-  final Pangu _pangu = Pangu();
 
   /// 已揭示的内联 spoiler ID 集合
   final Set<String> _revealedSpoilers = {};
@@ -120,6 +125,56 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
   /// 当帖子滑出再滑回时新 State 可直接命中，避免重复正则 + Pangu 处理
   static final Map<int, String> _globalPreprocessCache = {};
   static const int _maxGlobalCacheSize = 200;
+
+  /// Pangu 预处理缓存（支持 isolate 预热，避免首次渲染阻塞主线程）
+  static final Map<(int, int), String> _panguCache = {};
+  static const int _maxPanguCacheSize = 200;
+  static final Set<(int, int)> _pendingPanguKeys = {};
+
+  static (int, int) _panguKeyOf(String html) => (html.hashCode, html.length);
+
+  /// 批量预热 Pangu（在 isolate 中执行）
+  static void _preloadPangu(List<String> htmlList) {
+    final toProcess = <String>[];
+    for (final html in htmlList) {
+      final key = _panguKeyOf(html);
+      if (_panguCache.containsKey(key) || _pendingPanguKeys.contains(key)) {
+        continue;
+      }
+      toProcess.add(html);
+      _pendingPanguKeys.add(key);
+    }
+    if (toProcess.isEmpty) return;
+
+    compute(_batchPanguInIsolate, toProcess).then((results) {
+      for (int i = 0; i < toProcess.length; i++) {
+        final key = _panguKeyOf(toProcess[i]);
+        _panguCache[key] = results[i];
+        _pendingPanguKeys.remove(key);
+      }
+      while (_panguCache.length > _maxPanguCacheSize) {
+        _panguCache.remove(_panguCache.keys.first);
+      }
+    });
+  }
+
+  /// 获取 Pangu 处理结果（优先缓存，回退同步处理）
+  static String _applyPangu(String html) {
+    final key = _panguKeyOf(html);
+    final cached = _panguCache[key];
+    if (cached != null) {
+      _panguCache.remove(key);
+      _panguCache[key] = cached;
+      return cached;
+    }
+    // 缓存未命中，同步处理并缓存
+    final result = Pangu().spacingText(html);
+    while (_panguCache.length >= _maxPanguCacheSize) {
+      _panguCache.remove(_panguCache.keys.first);
+    }
+    _panguCache[key] = result;
+    return result;
+  }
 
   @override
   void initState() {
@@ -161,7 +216,8 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
       return globalCached;
     }
 
-    var processedHtml = html;
+    // Pangu 混排优先处理（命中 isolate 预热缓存时无主线程开销）
+    var processedHtml = enablePanguSpacing ? _applyPangu(html) : html;
 
     // 0. 将相对路径转换为绝对路径（修复新发帖子图片不显示的问题）
     // Discourse 创建帖子返回的 cooked 中图片使用相对路径 src="/uploads/..."
@@ -229,10 +285,6 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
     // - isChunkChild: 分块子块（需要注入，因为分块时顶层没有处理 HTML）
     if (widget.linkCounts != null && (widget.fullHtml == null || widget.isChunkChild)) {
       processedHtml = _injectClickCounts(processedHtml);
-    }
-
-    if (enablePanguSpacing) {
-      processedHtml = _pangu.spacingText(processedHtml);
     }
 
     // 存入全局缓存
@@ -326,7 +378,7 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
     final theme = Theme.of(context);
     final linkColor = theme.colorScheme.primary.toARGB32().toRadixString(16).substring(2);
     final enablePanguSpacing =
-        widget.enablePanguSpacing ?? ref.watch(preferencesProvider).autoPanguSpacing;
+        widget.enablePanguSpacing ?? ref.watch(preferencesProvider).displayPanguSpacing;
     // 仅当输入变化时才重新执行正则预处理，避免每次 build 都重复计算
     if (_cachedProcessedHtml == null ||
         _cachedRawHtml != widget.html ||
@@ -794,4 +846,10 @@ class _DiscourseHtmlContentState extends ConsumerState<DiscourseHtmlContent> {
     }
     return count.toString();
   }
+}
+
+/// 在 isolate 中批量执行 Pangu 混排
+List<String> _batchPanguInIsolate(List<String> htmlList) {
+  final pangu = Pangu();
+  return htmlList.map((html) => pangu.spacingText(html)).toList();
 }

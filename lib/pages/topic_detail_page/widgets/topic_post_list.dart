@@ -102,6 +102,8 @@ class _TopicPostListState extends State<TopicPostList> {
   List<_PostRenderSegment> _renderSegments = const [];
   Map<int, int> _postIndexToScrollIndex = const {};
   Map<int, int> _scrollIndexToPostNumber = const {};
+  /// postNumber → postIndex 反查表（避免 indexWhere 线性查找）
+  Map<int, int> _postNumberToIndex = const {};
   SelectedContent? _lastLongPostSelectedContent;
   Post? _activeLongSelectionPost;
   CodeSelectionContext? _lastLongCodeSelectionContext;
@@ -213,7 +215,7 @@ class _TopicPostListState extends State<TopicPostList> {
 
       // 帖子包含 eyeline → 即为当前帖子
       if (topY <= eyeline && bottomY > eyeline) {
-        eyelinePostIndex = posts.indexWhere((p) => p.postNumber == postNumber);
+        eyelinePostIndex = _postNumberToIndex[postNumber];
       }
 
       // 记录距 eyeline 最近的帖子（兜底用）
@@ -222,7 +224,7 @@ class _TopicPostListState extends State<TopicPostList> {
           : (bottomY < eyeline ? eyeline - bottomY : 0.0);
       if (distance < closestDistance) {
         closestDistance = distance;
-        closestPostIndex = posts.indexWhere((p) => p.postNumber == postNumber);
+        closestPostIndex = _postNumberToIndex[postNumber];
       }
     }
 
@@ -279,6 +281,7 @@ class _TopicPostListState extends State<TopicPostList> {
     final segments = <_PostRenderSegment>[];
     final postIndexToScrollIndex = <int, int>{};
     final scrollIndexToPostNumber = <int, int>{};
+    final postNumberToIndex = <int, int>{};
     final gaps = detail.postStream.gaps;
 
     for (int postIndex = 0; postIndex < posts.length; postIndex++) {
@@ -302,6 +305,7 @@ class _TopicPostListState extends State<TopicPostList> {
       final useLongSegments = renderData.chunks.isNotEmpty;
 
       postIndexToScrollIndex[postIndex] = segments.length;
+      postNumberToIndex[post.postNumber] = postIndex;
 
       if (!useLongSegments) {
         scrollIndexToPostNumber[segments.length] = post.postNumber;
@@ -356,6 +360,7 @@ class _TopicPostListState extends State<TopicPostList> {
     _renderSegments = segments;
     _postIndexToScrollIndex = postIndexToScrollIndex;
     _scrollIndexToPostNumber = scrollIndexToPostNumber;
+    _postNumberToIndex = postNumberToIndex;
     widget.onScrollIndexMappingChanged?.call(postIndexToScrollIndex);
   }
 

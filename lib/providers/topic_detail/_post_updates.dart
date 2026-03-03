@@ -22,6 +22,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
     try {
       final service = ref.read(discourseServiceProvider);
       final updatedPost = await service.getPost(postId);
+      if (!ref.mounted) return;
 
       final finalPost = preserveCooked
           ? updatedPost.copyWith(
@@ -232,6 +233,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
         currentDetail.id,
         level,
       );
+      if (!ref.mounted) return;
 
       state = AsyncValue.data(currentDetail.copyWith(notificationLevel: level));
     } catch (e) {
@@ -269,12 +271,14 @@ extension PostUpdateMethods on TopicDetailNotifier {
       final bookmarkId = currentDetail.bookmarkId;
       if (bookmarkId == null) return;
       await service.deleteBookmark(bookmarkId);
+      if (!ref.mounted) return;
       state = AsyncValue.data(currentDetail.copyWith(
         bookmarked: false,
         clearBookmarkId: true,
       ));
     } else {
       final newBookmarkId = await service.bookmarkTopic(currentDetail.id);
+      if (!ref.mounted) return;
       state = AsyncValue.data(currentDetail.copyWith(
         bookmarked: true,
         bookmarkId: newBookmarkId,
@@ -290,6 +294,7 @@ extension PostUpdateMethods on TopicDetailNotifier {
     try {
       final service = ref.read(discourseServiceProvider);
       final newDetail = await service.getTopicDetail(arg.topicId, postNumber: 1);
+      if (!ref.mounted) return;
       // 只更新元数据，保留当前帖子列表
       state = AsyncValue.data(currentDetail.copyWith(
         title: newDetail.title,

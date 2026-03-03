@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/preferences_provider.dart';
@@ -12,7 +14,7 @@ class PreferencesPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('偏好设置'),
+        title: const Text('功能设置'),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -91,93 +93,24 @@ class PreferencesPage extends ConsumerWidget {
                     ref.read(preferencesProvider.notifier).setAutoFillLogin(value);
                   },
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          _buildSectionHeader(theme, '阅读'),
-          const SizedBox(height: 12),
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.surfaceContainerLow,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha:0.2)),
-            ),
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.format_size_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('内容字体大小'),
-                            Text(
-                              '${(preferences.contentFontScale * 100).round()}%',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: preferences.contentFontScale != 1.0
-                            ? () => ref.read(preferencesProvider.notifier).setContentFontScale(1.0)
-                            : null,
-                        child: const Text('重置'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                if (Platform.isIOS || Platform.isAndroid) ...[
+                  Divider(height: 1, indent: 56, color: theme.colorScheme.outlineVariant.withValues(alpha:0.3)),
+                  SwitchListTile(
+                    title: const Text('竖屏锁定'),
+                    subtitle: const Text('锁定屏幕方向为竖屏'),
+                    secondary: Icon(
+                      Icons.screen_lock_portrait_rounded,
+                      color: preferences.portraitLock
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
-                    child: Slider(
-                      value: preferences.contentFontScale,
-                      min: 0.8,
-                      max: 1.4,
-                      divisions: 12,
-                      label: '${(preferences.contentFontScale * 100).round()}%',
-                      onChanged: (value) {
-                        ref.read(preferencesProvider.notifier).setContentFontScale(value);
-                      },
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '小',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 11,
-                        ),
-                      ),
-                      Text(
-                        '大',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
+                    value: preferences.portraitLock,
+                    onChanged: (value) {
+                      ref.read(preferencesProvider.notifier).setPortraitLock(value);
+                    },
                   ),
                 ],
-              ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -207,6 +140,62 @@ class PreferencesPage extends ConsumerWidget {
               },
             ),
           ),
+          if (Platform.isAndroid) ...[
+            const SizedBox(height: 24),
+            _buildSectionHeader(theme, '高级'),
+            const SizedBox(height: 12),
+            Card(
+              elevation: 0,
+              color: theme.colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha:0.2)),
+              ),
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: SwitchListTile(
+                title: const Text('崩溃日志上报'),
+                subtitle: const Text('发生崩溃时自动上报日志，帮助开发者定位问题'),
+                secondary: Icon(
+                  Icons.bug_report_rounded,
+                  color: preferences.crashlytics
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                value: preferences.crashlytics,
+                onChanged: (value) async {
+                  if (value) {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('开启崩溃日志上报'),
+                        content: const Text(
+                          '开启后，应用崩溃时会将崩溃日志上传到 Firebase Crashlytics 服务，'
+                          '用于帮助开发者定位和修复问题。\n\n'
+                          '上报内容仅包含崩溃堆栈信息，不包含个人数据。',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('取消'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('开启'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      ref.read(preferencesProvider.notifier).setCrashlytics(true);
+                    }
+                  } else {
+                    ref.read(preferencesProvider.notifier).setCrashlytics(false);
+                  }
+                },
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),

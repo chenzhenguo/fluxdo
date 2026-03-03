@@ -38,7 +38,7 @@ extension FilterMethods on TopicDetailNotifier {
 
     await Future.delayed(Duration.zero);
 
-    state = await AsyncValue.guard(() async {
+    final result = await AsyncValue.guard(() async {
       final service = ref.read(discourseServiceProvider);
       final detail = await service.getTopicDetail(
         arg.topicId,
@@ -51,6 +51,8 @@ extension FilterMethods on TopicDetailNotifier {
 
       return detail;
     });
+    if (!ref.mounted) return;
+    state = result;
   }
 
   /// 使用当前 filter 重新加载数据
@@ -59,7 +61,7 @@ extension FilterMethods on TopicDetailNotifier {
     _hasMoreAfter = true;
     _hasMoreBefore = true;
 
-    state = await AsyncValue.guard(() async {
+    final result = await AsyncValue.guard(() async {
       final service = ref.read(discourseServiceProvider);
       final detail = await service.getTopicDetail(arg.topicId, filter: _filter, usernameFilters: _usernameFilter);
 
@@ -67,6 +69,8 @@ extension FilterMethods on TopicDetailNotifier {
 
       return detail;
     });
+    if (!ref.mounted) return;
+    state = result;
   }
 
   /// 过滤模式下根据 stream ID 加载更多帖子
@@ -77,7 +81,7 @@ extension FilterMethods on TopicDetailNotifier {
       // ignore: invalid_use_of_internal_member
       state = const AsyncLoading<TopicDetail>().copyWithPrevious(state);
 
-      state = await AsyncValue.guard(() async {
+      final result = await AsyncValue.guard(() async {
         final currentDetail = state.requireValue;
         final currentPosts = currentDetail.postStream.posts;
         final stream = currentDetail.postStream.stream;
@@ -121,6 +125,8 @@ extension FilterMethods on TopicDetailNotifier {
           postStream: PostStream(posts: mergedPosts, stream: stream, gaps: currentDetail.postStream.gaps),
         );
       });
+      if (!ref.mounted) return;
+      state = result;
     } finally {
       _isLoadingMore = false;
     }
@@ -134,7 +140,7 @@ extension FilterMethods on TopicDetailNotifier {
       // ignore: invalid_use_of_internal_member
       state = const AsyncLoading<TopicDetail>().copyWithPrevious(state);
 
-      state = await AsyncValue.guard(() async {
+      final result = await AsyncValue.guard(() async {
         final currentDetail = state.requireValue;
         final currentPosts = currentDetail.postStream.posts;
         final stream = currentDetail.postStream.stream;
@@ -176,6 +182,8 @@ extension FilterMethods on TopicDetailNotifier {
           postStream: PostStream(posts: mergedPosts, stream: stream, gaps: currentDetail.postStream.gaps),
         );
       });
+      if (!ref.mounted) return;
+      state = result;
     } finally {
       _isLoadingPrevious = false;
     }
