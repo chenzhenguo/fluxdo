@@ -306,7 +306,6 @@ class _MainPageState extends ConsumerState<MainPage> with WidgetsBindingObserver
       // 双击当前 tab，滚动到顶部
       if (index == 0) {
         ref.read(scrollToTopProvider.notifier).trigger();
-        ref.read(barVisibilityProvider.notifier).state = 1.0;
       }
       _lastTappedIndex = null;
       _lastTapTime = null;

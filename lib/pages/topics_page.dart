@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_riverpod/legacy.dart';
@@ -43,6 +44,14 @@ final scrollToTopProvider = StateNotifierProvider<ScrollToTopNotifier, int>((ref
 
 /// 顶栏/底栏可见性进度（0.0 = 完全隐藏, 1.0 = 完全显示）
 final barVisibilityProvider = StateProvider<double>((ref) => 1.0);
+
+/// FAB 是否处于刷新模式（用户正在向上滚动时为 true）
+final fabRefreshModeProvider = StateProvider<bool>((ref) => false);
+
+/// FAB 触发刷新信号
+final fabRefreshSignalProvider = StateNotifierProvider<ScrollToTopNotifier, int>((ref) {
+  return ScrollToTopNotifier();
+});
 
 /// Header 区域常量
 const _searchBarHeight = 56.0;
@@ -367,14 +376,21 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
 
     // 监听滚动到顶部的通知
     ref.listen(scrollToTopProvider, (previous, next) {
+      ref.read(fabRefreshModeProvider.notifier).state = false;
+      // 通过 outer controller 的 animateTo 驱动 coordinator 统一动画。
+      // 目标设为 outer 当前 offset，这样 coordinator 的 nestOffset 会：
+      //   - outer → 保持当前位置（header 状态不变）
+      //   - inner → 回到 minScrollExtent（列表回顶部）
+      //
+      // 不能调用 inner 的 animateTo(0)，因为 unnestOffset 的边界条件 bug
+      // 会导致 coordinator 反而把 outer 推到 maxScrollExtent。
       if (_outerScrollController.hasClients && _outerScrollController.positions.length == 1) {
         _outerScrollController.animateTo(
-          0,
+          _outerScrollController.offset,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       }
-      _getListKey(_currentCategoryId()).currentState?.scrollToTop();
     });
 
     return Listener(
@@ -414,7 +430,7 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
                 onAddTag: _openTagSelection,
                 onTabTap: (index) {
                   if (index == _currentTabIndex) {
-                    _getListKey(_currentCategoryId()).currentState?.scrollToTop();
+                    ref.read(scrollToTopProvider.notifier).trigger();
                   }
                 },
                 onCategoryManager: _openCategoryManager,
@@ -463,6 +479,32 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
   }
 
   bool _handleOuterScrollNotification(ScrollNotification notification) {
+    // 用 UserScrollNotification 追踪用户主动滚动方向，避免回弹/惯性误触发
+    if (notification is UserScrollNotification &&
+        notification.metrics.axis == Axis.vertical) {
+      if (notification.direction == ScrollDirection.forward) {
+        // 向上滚动（朝顶部方向）→ 刷新模式
+        if (!ref.read(fabRefreshModeProvider)) {
+          ref.read(fabRefreshModeProvider.notifier).state = true;
+        }
+      } else if (notification.direction == ScrollDirection.reverse) {
+        // 向下滚动（深入列表）→ 创建模式
+        if (ref.read(fabRefreshModeProvider)) {
+          ref.read(fabRefreshModeProvider.notifier).state = false;
+        }
+      }
+    }
+
+    // 内部列表到达顶部时恢复创建模式
+    if (notification is ScrollUpdateNotification &&
+        notification.depth > 0 &&
+        notification.metrics.axis == Axis.vertical &&
+        notification.metrics.pixels <= 0 &&
+        ref.read(fabRefreshModeProvider)) {
+      ref.read(fabRefreshModeProvider.notifier).state = false;
+    }
+
+    // snap 逻辑仅处理外层滚动
     if (notification.depth != 0) return false;
 
     if (notification is ScrollEndNotification && !_isSnapping) {
@@ -600,8 +642,9 @@ class _TopicsHeaderDelegate extends SliverPersistentHeaderDelegate {
     final container = ProviderScope.containerOf(context, listen: false);
     final current = container.read(barVisibilityProvider);
     if ((visibility - current).abs() > 0.01) {
+      final v = visibility;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        container.read(barVisibilityProvider.notifier).state = visibility;
+        container.read(barVisibilityProvider.notifier).state = v;
       });
     }
 
@@ -767,6 +810,7 @@ class _TopicList extends ConsumerStatefulWidget {
 
 class _TopicListState extends ConsumerState<_TopicList>
     with AutomaticKeepAliveClientMixin {
+  final _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
   bool _isLoadingNewTopics = false;
   bool _keepAlive = true;
 
@@ -816,6 +860,14 @@ class _TopicListState extends ConsumerState<_TopicList>
   Widget build(BuildContext context) {
     super.build(context); // AutomaticKeepAliveClientMixin 需要
 
+    // 监听 FAB 刷新信号，仅当前 tab 响应
+    ref.listen(fabRefreshSignalProvider, (_, __) {
+      final currentCategoryId = ref.read(currentTabCategoryIdProvider);
+      if (widget.categoryId == currentCategoryId) {
+        _refreshIndicatorKey.currentState?.show();
+      }
+    });
+
     // 监听 refreshAll 的失活信号，非当前 tab 释放 keepAlive
     ref.listen(topicTabDeactivateSignal, (_, __) {
       final currentCategoryId = ref.read(currentTabCategoryIdProvider);
@@ -861,6 +913,7 @@ class _TopicListState extends ConsumerState<_TopicList>
         final newTopicOffset = hasNewTopics ? 1 : 0;
 
         return RefreshIndicator(
+          key: _refreshIndicatorKey,
           onRefresh: () async {
             try {
               // ignore: unused_result

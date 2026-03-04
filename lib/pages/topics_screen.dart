@@ -138,10 +138,8 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen> {
             )
           : null,
       masterFloatingActionButton: user != null
-          ? FloatingActionButton(
-              heroTag: 'createTopic',
-              onPressed: () => _createTopic(context, ref),
-              child: const Icon(Icons.add),
+          ? _TopicsFab(
+              onCreateTopic: () => _createTopic(context, ref),
             )
           : null,
     );
@@ -164,6 +162,36 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen> {
       // 在 Master-Detail 模式下，选中新话题
       ref.read(selectedTopicProvider.notifier).select(topicId: topicId);
     }
+  }
+}
+
+/// 首页 FAB：向上滚动时切换为刷新按钮
+class _TopicsFab extends ConsumerWidget {
+  const _TopicsFab({required this.onCreateTopic});
+
+  final VoidCallback onCreateTopic;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showRefresh = ref.watch(fabRefreshModeProvider);
+
+    return FloatingActionButton(
+      heroTag: 'createTopic',
+      onPressed: showRefresh ? () => _refreshTopics(ref) : onCreateTopic,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: Icon(
+          showRefresh ? Icons.refresh : Icons.add,
+          key: ValueKey(showRefresh),
+        ),
+      ),
+    );
+  }
+
+  void _refreshTopics(WidgetRef ref) {
+    ref.read(fabRefreshModeProvider.notifier).state = false;
+    ref.read(scrollToTopProvider.notifier).trigger();
+    ref.read(fabRefreshSignalProvider.notifier).trigger();
   }
 }
 
