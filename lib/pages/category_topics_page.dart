@@ -33,6 +33,7 @@ class _CategoryTopicsPageState extends ConsumerState<CategoryTopicsPage> {
   List<Topic> _topics = [];
   bool _isLoading = true;
   bool _isLoadingMore = false;
+  bool _isLoadMoreFailed = false;
   bool _hasMore = true;
   int _page = 0;
   Object? _error;
@@ -153,6 +154,7 @@ class _CategoryTopicsPageState extends ConsumerState<CategoryTopicsPage> {
   }
 
   Future<void> _loadMore() async {
+    if (_isLoadMoreFailed) return;
     if (!_hasMore || _isLoadingMore || _isLoading) return;
 
     setState(() => _isLoadingMore = true);
@@ -190,7 +192,10 @@ class _CategoryTopicsPageState extends ConsumerState<CategoryTopicsPage> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingMore = false);
+        setState(() {
+          _isLoadingMore = false;
+          _isLoadMoreFailed = true;
+        });
       }
     }
   }
@@ -417,13 +422,41 @@ class _CategoryTopicsPageState extends ConsumerState<CategoryTopicsPage> {
         itemCount: _topics.length + 1,
         itemBuilder: (context, index) {
           if (index >= _topics.length) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
-                child: _hasMore
-                    ? const CircularProgressIndicator()
-                    : const Text('没有更多了', style: TextStyle(color: Colors.grey)),
-              ),
+            if (!_hasMore) {
+              return const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(
+                  child: Text('没有更多了', style: TextStyle(color: Colors.grey)),
+                ),
+              );
+            }
+            if (_isLoadMoreFailed) {
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _isLoadMoreFailed = false);
+                      _loadMore();
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh, size: 16, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          '加载失败，点击重试',
+                          style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+            return const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
             );
           }
 

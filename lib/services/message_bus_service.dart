@@ -60,6 +60,9 @@ class MessageBusService {
   int _failureCount = 0;
   static const int _maxBackoffSeconds = 30;
   static const Duration _backgroundPollInterval = Duration(seconds: 60);
+  // 对齐 Discourse message-bus minPollInterval (100ms)
+  static const Duration _minPollInterval = Duration(milliseconds: 100);
+  DateTime? _lastPollTime;
 
   // MessageBus 独立域名配置
   String? _baseUrl;  // 独立域名（如 https://ping.linux.do），null 表示用主站
@@ -79,6 +82,8 @@ class MessageBusService {
             'Accept': 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded',
           },
+          // 长轮询不受并发限制，避免占用 API 请求的并发槽位
+          maxConcurrent: null,
         );
 
   /// 配置 MessageBus 独立域名（登录后从预加载数据获取）
@@ -96,6 +101,7 @@ class MessageBusService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         baseUrl: baseUrl,
+        maxConcurrent: null,
       );
       debugPrint('[MessageBus] 配置独立域名: $baseUrl');
     } else if (changed && baseUrl == null) {
@@ -106,6 +112,7 @@ class MessageBusService {
           'Accept': 'application/json',
           'Content-Type': 'application/x-www-form-urlencoded',
         },
+        maxConcurrent: null,
       );
       debugPrint('[MessageBus] 恢复主站轮询');
     }
@@ -211,6 +218,18 @@ class MessageBusService {
       _currentCancelToken = CancelToken();
 
       try {
+        // 最小轮询间隔保护，防止频繁 subscribe/cancel 导致请求风暴
+        if (_lastPollTime != null) {
+          final elapsed = DateTime.now().difference(_lastPollTime!);
+          if (elapsed < _minPollInterval) {
+            await _cancelableDelay(_minPollInterval - elapsed, _currentCancelToken!);
+            if (_shouldStop || (_currentCancelToken?.isCancelled ?? false)) {
+              if (_shouldStop) break;
+              continue;
+            }
+          }
+        }
+
         // 后台模式使用更长的轮询间隔（对齐 Discourse backgroundCallbackInterval）
         if (_backgroundMode) {
           await _cancelableDelay(_backgroundPollInterval, _currentCancelToken!);
@@ -226,6 +245,7 @@ class MessageBusService {
         }
 
         debugPrint('[MessageBus] 发起轮询: $payload');
+        _lastPollTime = DateTime.now();
 
         // 使用流式响应 + CancelToken
         final extraHeaders = <String, dynamic>{};
@@ -287,7 +307,6 @@ class MessageBusService {
             break;
           }
           debugPrint('[MessageBus] 请求已取消，重新轮询');
-          await Future.delayed(const Duration(milliseconds: 100));
           continue;
         }
 

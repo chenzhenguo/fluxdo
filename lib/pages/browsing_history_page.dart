@@ -137,14 +137,35 @@ class _BrowsingHistoryPageState extends ConsumerState<BrowsingHistoryPage> {
             itemCount: topics.length + 1,
             itemBuilder: (context, index) {
               if (index == topics.length) {
-                final hasMore = ref.read(browsingHistoryProvider.notifier).hasMore;
-                if (!hasMore) {
+                final notifier = ref.watch(browsingHistoryProvider.notifier);
+                if (!notifier.hasMore) {
                   return const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Center(
                       child: Text(
                         '没有更多了',
                         style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  );
+                }
+                if (notifier.isLoadMoreFailed) {
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => notifier.retryLoadMore(),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.refresh, size: 16, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              '加载失败，点击重试',
+                              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );

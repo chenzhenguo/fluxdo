@@ -38,6 +38,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   bool _hasMorePosts = false;
   bool _hasMoreUsers = false;
   bool _hasError = false;
+  bool _isLoadMoreFailed = false;
   String _errorMessage = '';
 
   // 最近搜索记录
@@ -146,6 +147,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         _hasMorePosts = false;
         _hasMoreUsers = false;
         _hasError = false;
+        _isLoadMoreFailed = false;
       });
       _performSearch();
     }
@@ -306,9 +308,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   Future<void> _performSearch() async {
     if (_currentQuery.isEmpty) return;
 
+    final isLoadMore = _currentPage > 1;
+
     setState(() {
       _hasError = false;
-      if (_currentPage == 1) {
+      _isLoadMoreFailed = false;
+      if (!isLoadMore) {
         _isLoadingMore = false;
       }
     });
@@ -357,15 +362,22 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       });
     } catch (e) {
       setState(() {
-        _hasError = true;
-        _errorMessage = e.toString();
         _isLoadingMore = false;
+        if (isLoadMore) {
+          // 加载更多失败：回退页码，显示重试
+          _currentPage--;
+          _isLoadMoreFailed = true;
+        } else {
+          // 首次搜索失败：显示全局错误
+          _hasError = true;
+          _errorMessage = e.toString();
+        }
       });
     }
   }
 
   Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMorePosts || _hasError) return;
+    if (_isLoadingMore || !_hasMorePosts || _isLoadMoreFailed) return;
 
     setState(() {
       _isLoadingMore = true;
@@ -770,7 +782,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             itemCount:
                 _allPosts.length +
                 (_allUsers.isNotEmpty ? _allUsers.length + 1 : 0) +
-                (_isLoadingMore ? 1 : 0),
+                (_isLoadingMore || _isLoadMoreFailed ? 1 : 0),
             itemBuilder: (context, index) {
               // 帖子结果（标准 + AI 混合）
               if (index < _allPosts.length) {
@@ -846,6 +858,32 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     },
                   );
                 }
+              }
+
+              // 加载更多失败重试
+              if (_isLoadMoreFailed) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _isLoadMoreFailed = false);
+                        _loadMore();
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh, size: 16, color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            '加载失败，点击重试',
+                            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
               }
 
               // 加载更多指示器

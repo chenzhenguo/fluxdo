@@ -22,6 +22,7 @@ class DiscourseDio {
     Duration receiveTimeout = const Duration(seconds: 30),
     Map<String, dynamic>? defaultHeaders,
     String? baseUrl,
+    int? maxConcurrent = 6,
   }) {
     final dio = Dio(BaseOptions(
       baseUrl: baseUrl ?? AppConstants.baseUrl,
@@ -37,8 +38,10 @@ class DiscourseDio {
     // 1. 配置平台适配器
     configurePlatformAdapter(dio);
 
-    // 2. 并发限制（最多 6 个请求同时在飞，其余排队）
-    dio.interceptors.add(ConcurrencyInterceptor(maxConcurrent: 6));
+    // 2. 并发限制（null 表示不限制）
+    if (maxConcurrent != null) {
+      dio.interceptors.add(ConcurrencyInterceptor(maxConcurrent: maxConcurrent));
+    }
 
     // 3. Cookie 管理
     final cookieJarService = CookieJarService();
