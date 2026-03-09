@@ -1,3 +1,19 @@
+## v0.1.43
+
+- ✨ 一些功能优化
+
+- Add invite links and remember AI model selection (#120)
+
+- Co-authored-by: N1nEmAn <S3vn@S3vn.localdomain>
+
+- 🐛 修复了一些问题，ref #116
+
+- ✨ 元宇宙功能优化
+
+- ✨ 网络添加会话代守卫拦截器，提升应用稳定性
+
+- ✨ 过盾体验优化
+
 ## v0.1.42
 
 - ✨ 应用日志功能优化
