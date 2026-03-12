@@ -4,8 +4,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../models/topic.dart';
 import '../../models/category.dart';
 import '../../providers/discourse_providers.dart';
-import '../../constants.dart';
 import '../../utils/font_awesome_helper.dart';
+import '../../utils/url_helper.dart';
 import '../common/topic_badges.dart';
 import '../common/smart_avatar.dart';
 import '../../services/discourse_cache_manager.dart';
@@ -262,9 +262,7 @@ class TopicCard extends ConsumerWidget {
     if (topic.posters.isNotEmpty) {
       final op = topic.posters.first;
       if (op.user != null) {
-        final avatarUrl = op.user!.avatarTemplate.startsWith('http')
-            ? op.user!.getAvatarUrl(size: 68)
-            : '${AppConstants.baseUrl}${op.user!.getAvatarUrl(size: 68)}';
+        final avatarUrl = op.user!.getAvatarUrl(size: 68);
         return SmartAvatar(
           imageUrl: avatarUrl,
           radius: 17,
@@ -434,9 +432,7 @@ class CompactTopicCard extends ConsumerWidget {
                 else if (logoUrl != null && logoUrl.isNotEmpty)
                   Image(
                     image: discourseImageProvider(
-                      logoUrl.startsWith('http')
-                          ? logoUrl
-                          : '${AppConstants.baseUrl}$logoUrl',
+                      UrlHelper.resolveUrl(logoUrl),
                     ),
                     width: 12,
                     height: 12,
