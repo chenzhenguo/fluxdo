@@ -380,30 +380,53 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                                   iconSize: 20,
                                   onPressed: _enterSelectionMode,
                                 ),
-                              IconButton(
-                                icon: const Icon(Icons.add_comment_outlined),
-                                tooltip: '新建会话',
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert),
+                                tooltip: '更多',
                                 iconSize: 20,
-                                onPressed: () {
-                                  chatNotifier.createNewSession();
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'new_session':
+                                      chatNotifier.createNewSession();
+                                    case 'history':
+                                      _showSessionHistory(
+                                          context, chatState, chatNotifier);
+                                    case 'clear':
+                                      _confirmClear(context, chatNotifier);
+                                  }
                                 },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'new_session',
+                                    child: ListTile(
+                                      leading: Icon(Icons.add_comment_outlined),
+                                      title: Text('新建会话'),
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                  ),
+                                  if (chatState.sessions.isNotEmpty)
+                                    const PopupMenuItem(
+                                      value: 'history',
+                                      child: ListTile(
+                                        leading: Icon(Icons.history),
+                                        title: Text('会话记录'),
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  if (chatState.messages.isNotEmpty)
+                                    const PopupMenuItem(
+                                      value: 'clear',
+                                      child: ListTile(
+                                        leading: Icon(Icons.delete_outline),
+                                        title: Text('清空聊天'),
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                ],
                               ),
-                              if (chatState.sessions.isNotEmpty)
-                                IconButton(
-                                  icon: const Icon(Icons.history),
-                                  tooltip: '会话记录',
-                                  iconSize: 20,
-                                  onPressed: () => _showSessionHistory(
-                                      context, chatState, chatNotifier),
-                                ),
-                              if (chatState.messages.isNotEmpty)
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  tooltip: '清空聊天',
-                                  iconSize: 20,
-                                  onPressed: () =>
-                                      _confirmClear(context, chatNotifier),
-                                ),
                             ],
                           ),
                         ],
