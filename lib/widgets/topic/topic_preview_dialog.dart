@@ -19,6 +19,8 @@ import '../common/emoji_text.dart';
 import '../common/smart_avatar.dart';
 import '../common/topic_badges.dart';
 import '../content/discourse_html_content/discourse_html_content.dart';
+import '../../pages/category_topics_page.dart';
+import '../../pages/tag_topics_page.dart';
 
 /// 预览弹窗中的操作项
 class PreviewAction {
@@ -435,56 +437,64 @@ class _TopicPreviewDialogState extends ConsumerState<TopicPreviewDialog> {
       children: [
         // 分类
         if (category != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _parseColor(category.color).withValues(alpha:0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _parseColor(category.color).withValues(alpha:0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (faIcon != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: FaIcon(
-                      faIcon,
-                      size: 12,
-                      color: _parseColor(category.color),
-                    ),
-                  )
-                else if (logoUrl != null && logoUrl.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Image(
-                      image: discourseImageProvider(
-                        UrlHelper.resolveUrlWithCdn(logoUrl),
-                      ),
-                      width: 12,
-                      height: 12,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildCategoryDot(category);
-                      },
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: _buildCategoryDot(category),
-                  ),
-                Text(
-                  category.name,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.onSurface,
-                  ),
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => CategoryTopicsPage(category: category)),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: _parseColor(category.color).withValues(alpha:0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _parseColor(category.color).withValues(alpha:0.3),
+                  width: 1,
                 ),
-              ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (faIcon != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: FaIcon(
+                        faIcon,
+                        size: 12,
+                        color: _parseColor(category.color),
+                      ),
+                    )
+                  else if (logoUrl != null && logoUrl.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Image(
+                        image: discourseImageProvider(
+                          UrlHelper.resolveUrlWithCdn(logoUrl),
+                        ),
+                        width: 12,
+                        height: 12,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildCategoryDot(category);
+                        },
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _buildCategoryDot(category),
+                    ),
+                  Text(
+                    category.name,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -501,6 +511,12 @@ class _TopicPreviewDialogState extends ConsumerState<TopicPreviewDialog> {
             textStyle: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => TagTopicsPage(tagName: tag.name)),
+              );
+            },
           ),
         ),
       ],
