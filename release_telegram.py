@@ -71,7 +71,11 @@ def main() -> int:
         )
         files[key] = file_path.open("rb")
 
-    media[-1]["caption"] = escape_markdown(text)
+    caption = escape_markdown(text)
+    # Telegram sendMediaGroup caption 限制 1024 字符
+    if len(caption) > 1024:
+        caption = caption[:1021] + "..."
+    media[-1]["caption"] = caption
     media[-1]["parse_mode"] = "Markdown"
 
     response = requests.post(

@@ -97,6 +97,10 @@ jobs:
           mkdir -p android/app/src/main/res/raw
           cp core/doh_proxy/certs/ca.der android/app/src/main/res/raw/proxy_ca.der
 
+      - name: Configure Git for CocoaPods
+        if: matrix.platform == 'ios' || matrix.platform == 'macos'
+        run: git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
+
       - name: Get dependencies
         run: flutter pub get
 
