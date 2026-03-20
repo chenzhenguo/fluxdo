@@ -32,6 +32,8 @@ import '../widgets/common/fading_edge_scroll_view.dart';
 import '../widgets/offline_indicator.dart';
 import '../l10n/s.dart';
 import '../services/toast_service.dart';
+import '../providers/topic_list/local_filter_provider.dart';
+import '../widgets/topic/local_filter_sheet.dart';
 
 class ScrollToTopNotifier extends StateNotifier<int> {
   ScrollToTopNotifier() : super(0);
@@ -299,6 +301,26 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
     }
   }
 
+  void _openLocalFilter() {
+    final categoriesAsync = ref.read(categoriesProvider);
+    final categories = categoriesAsync.when(
+      data: (cats) => cats,
+      loading: () => <Category>[],
+      error: (_, __) => <Category>[],
+    );
+    final tagsAsync = ref.read(tagsProvider);
+    final availableTags = tagsAsync.when(
+      data: (tags) => tags,
+      loading: () => <String>[],
+      error: (_, __) => <String>[],
+    );
+    showLocalFilterSheet(
+      context,
+      categories: categories,
+      availableTags: availableTags,
+    );
+  }
+
   /// 获取当前选中分类 Tab 对应的 Category（仅非"全部"时返回）
   Category? _getCurrentCategory(List<int> pinnedIds, Map<int, Category>? categoryMap) {
     if (_currentTabIndex == 0 || categoryMap == null) return null;
@@ -520,6 +542,8 @@ class _TopicsPageState extends ConsumerState<TopicsPage> with TickerProviderStat
                   );
                 },
                 onDebugTopicId: () => _showTopicIdDialog(context),
+                onLocalFilter: _openLocalFilter,
+                hasActiveLocalFilter: !ref.watch(localTopicFilterProvider).isEmpty,
                 trailing: _buildTrailing(currentCategory, isLoggedIn, currentFilter),
               ),
             ),
@@ -671,6 +695,8 @@ class _TopicsHeaderDelegate extends SliverPersistentHeaderDelegate {
   final VoidCallback onCategoryManager;
   final VoidCallback onSearch;
   final VoidCallback onDebugTopicId;
+  final VoidCallback onLocalFilter;
+  final bool hasActiveLocalFilter;
   final Widget? trailing;
   final bool hideBarOnScroll;
 
@@ -690,6 +716,8 @@ class _TopicsHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.onCategoryManager,
     required this.onSearch,
     required this.onDebugTopicId,
+    required this.onLocalFilter,
+    this.hasActiveLocalFilter = false,
     this.trailing,
     this.hideBarOnScroll = true,
   });
@@ -711,7 +739,8 @@ class _TopicsHeaderDelegate extends SliverPersistentHeaderDelegate {
         currentTags != oldDelegate.currentTags ||
         currentCategory != oldDelegate.currentCategory ||
         trailing != oldDelegate.trailing ||
-        hideBarOnScroll != oldDelegate.hideBarOnScroll;
+        hideBarOnScroll != oldDelegate.hideBarOnScroll ||
+        hasActiveLocalFilter != oldDelegate.hasActiveLocalFilter;
   }
 
   @override
@@ -785,6 +814,19 @@ class _TopicsHeaderDelegate extends SliverPersistentHeaderDelegate {
                           ),
                         ),
                         if (isLoggedIn) const NotificationIconButton(),
+                        // 本地过滤按钮
+                        IconButton(
+                          icon: Icon(
+                            Icons.filter_list,
+                            size: 20,
+                            color: hasActiveLocalFilter
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          onPressed: onLocalFilter,
+                          tooltip: '过滤话题',
+                          visualDensity: VisualDensity.compact,
+                        ),
                         if (kDebugMode)
                           IconButton(
                             icon: const Icon(Icons.bug_report),
@@ -1002,7 +1044,13 @@ class _TopicListState extends ConsumerState<_TopicList>
 
     return topicsAsync.when(
       data: (topics) {
-        if (topics.isEmpty) {
+        // 应用本地过滤
+        final localFilter = ref.watch(localTopicFilterProvider);
+        final filteredTopics = localFilter.isEmpty
+            ? topics
+            : topics.where((t) => localFilter.matches(t)).toList();
+
+        if (filteredTopics.isEmpty) {
           return RefreshIndicator(
             onRefresh: () async {
               try {
@@ -1055,14 +1103,14 @@ class _TopicListState extends ConsumerState<_TopicList>
               child: ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(top: 8, bottom: 12),
-                itemCount: topics.length + newTopicOffset + 1,
+                itemCount: filteredTopics.length + newTopicOffset + 1,
                 itemBuilder: (context, index) {
                   if (hasNewTopics && index == 0) {
                     return _buildNewTopicIndicator(context, newTopicCount, providerKey);
                   }
 
                   final topicIndex = index - newTopicOffset;
-                  if (topicIndex >= topics.length) {
+                  if (topicIndex >= filteredTopics.length) {
                     final notifier = ref.watch(topicListProvider(providerKey).notifier);
                     return Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -1089,7 +1137,7 @@ class _TopicListState extends ConsumerState<_TopicList>
                     );
                   }
 
-                  final topic = topics[topicIndex];
+                  final topic = filteredTopics[topicIndex];
                   final enableLongPress = ref.watch(preferencesProvider).longPressPreview;
                   final shouldHighlight = _highlightedTopicIds.contains(topic.id);
 
