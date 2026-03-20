@@ -14,6 +14,8 @@ on:
 jobs:
   build-debug-apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -85,3 +87,52 @@ jobs:
           name: debug-apk-${{ matrix.arch }}
           path: dist/fluxdo-debug-${{ matrix.arch }}.apk
           retention-days: 14
+
+  release:
+    needs: build-debug-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist/
+          pattern: debug-apk-*
+          merge-multiple: true
+
+      - name: List downloaded files
+        run: ls -la ./dist/
+
+      - name: Get tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          name: "Debug APK ${{ steps.tag.outputs.TAG }}"
+          body: |
+            ## Debug APK ${{ steps.tag.outputs.TAG }}
+
+            > ⚠️ 这是 **Debug 版本**，仅供测试使用。
+
+            ### 下载
+            | 文件 | 适用设备 |
+            |------|----------|
+            | `fluxdo-debug-arm64-v8a.apk` | 现代 Android 手机（推荐）|
+            | `fluxdo-debug-armeabi-v7a.apk` | 旧款 / 32 位设备 |
+
+            ### 本次更新
+            - feat: 话题列表本地过滤功能（关键字/信任等级/分类/标签）
+          draft: false
+          prerelease: true
+          files: ./dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
