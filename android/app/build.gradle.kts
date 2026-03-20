@@ -57,7 +57,8 @@ android {
         }
 
         debug {
-            signingConfig = signingConfigs.getByName("release")
+            // debug 构建使用系统自带 debug 签名，无需 keystore
+            signingConfig = signingConfigs.getByName("debug")
         }
 
         getByName("profile") {
